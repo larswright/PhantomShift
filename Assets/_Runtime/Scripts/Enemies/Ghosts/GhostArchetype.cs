@@ -6,12 +6,31 @@ public partial class GhostArchetype : ScriptableObject
     public enum Class { Weak, Possessor, Heavy }
     public Class ghostClass = Class.Weak;
 
+    [System.Serializable]
+    public struct MotionStats
+    {
+        public float moveSpeed;
+        public float acceleration;
+        public float angularSpeed;
+        public float stoppingDistance;
+    }
+
     [Header("Stats")]
     public int maxHP = 100;
-    public float moveSpeed = 3.6f;
-    public float acceleration = 40f;
-    public float angularSpeed = 900f;
-    public float stoppingDistance = 0.2f;
+    public MotionStats defaultStats = new MotionStats
+    {
+        moveSpeed = 3.6f,
+        acceleration = 40f,
+        angularSpeed = 900f,
+        stoppingDistance = 0.2f
+    };
+    public MotionStats fleeStats = new MotionStats
+    {
+        moveSpeed = 7.5f,
+        acceleration = 50f,
+        angularSpeed = 1000f,
+        stoppingDistance = 0.1f
+    };
 
     [Header("Wander")]
     public float wanderRadius = 12f;
@@ -39,11 +58,9 @@ public partial class GhostArchetype : ScriptableObject
     public float capture_uvSecondsToStun = 2.0f;
     public float capture_stunSeconds = 3.0f;
     public float capture_exposureGraceWindow = 0.6f;
-    public float capture_fleeDecisionInterval = 0.5f;
-    public Vector2 capture_fleeStepRange = new Vector2(8f, 15f);
-    public float capture_fleeRadius = 24f;
-    public AnimationCurve capture_escapeCurve = AnimationCurve.EaseInOut(0,0,1,1);
-    public AnimationCurve capture_stunCurve   = AnimationCurve.EaseInOut(0,1,1,0);
+    public float capture_fleeDecisionInterval = 0.25f;
+    public Vector2 capture_fleeStepRange = new Vector2(1.5f, 3.5f);
+    public float capture_fleeRadius = 10f;
 
     [Header("Capture – Aggressive Flee")]
     public float capture_fleeSpeedMultiplier = 2.2f;
