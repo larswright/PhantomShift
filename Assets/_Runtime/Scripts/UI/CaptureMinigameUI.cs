@@ -1,52 +1,82 @@
 using System;
 using UnityEngine;
+using UnityEngine.UI;
 
-/// <summary>
-/// UI extremamente simples com OnGUI para o minigame:
-/// - Barra [0..1]
-/// - Handle que corre da esquerda p/ direita com velocidade configurável
-/// - Marker fixo; jogador deve "bater" (Strike) próximo o suficiente
-/// Integração:
-///   PlayerVacuum chama Begin(...) e depois usa Interact para chamar Strike().
-/// </summary>
 public class CaptureMinigameUI : MonoBehaviour
 {
+    [Header("Prefab discovery")]
+    [Tooltip("Opcional: se nulo, será carregado de Resources/UI/CaptureMinigameCanvas")]
+    public GameObject prefabRoot; // raiz do prefab com Canvas
+
+    [Header("Bindings (no prefab)")]
+    public RectTransform barArea;          // área horizontal [0..1]
+    public RectTransform handleRT;         // barra/“cursor” que corre
+    public RectTransform markerRT;         // marcador fixo
+    public Image hitWindowImage;           // região de acerto (Image)
+    public Text infoText;                  // texto "Stage X • ..."
+
+    // ---- estado do minigame
     private uint ghostNetId;
     private int stageIndex;
-    private float speed;
-    private float marker;
-    private float window;
-
-    private float handle; // 0..1
+    private float speed;   // unidades normalizadas por segundo
+    private float marker;  // 0..1
+    private float window;  // raio, 0..0.25
+    private float handle;  // 0..1
     private Action<bool> onFinish;
     private bool active;
 
-    private Rect rect;
-    private const float W = 420f;
-    private const float H = 96f;
+    private static CaptureMinigameUI _instance;
 
+    // Mantém compatibilidade com PlayerVacuum: cria/retorna instância única
     public static CaptureMinigameUI Spawn(PlayerVacuum owner)
     {
-        var go = new GameObject("CaptureMinigameUI");
-        var ui = go.AddComponent<CaptureMinigameUI>();
-        DontDestroyOnLoad(go);
-        return ui;
+        if (_instance) return _instance;
+
+        // Tenta achar já na cena
+        _instance = FindObjectOfType<CaptureMinigameUI>(true);
+        if (_instance) { _instance.HideImmediate(); DontDestroyOnLoad(_instance.transform.root.gameObject); return _instance; }
+
+        // Tenta via Resources
+        var prefab = Resources.Load<GameObject>("UI/CaptureMinigameCanvas");
+        if (prefab)
+        {
+            var go = Instantiate(prefab);
+            DontDestroyOnLoad(go);
+            _instance = go.GetComponentInChildren<CaptureMinigameUI>(true);
+            if (_instance == null) _instance = go.AddComponent<CaptureMinigameUI>();
+            _instance.HideImmediate();
+            return _instance;
+        }
+
+        // Fallback: cria objeto raiz com Canvas (sem visuais configurados)
+        var root = new GameObject("CaptureMinigameCanvas_Fallback");
+        var canvas = root.AddComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        root.AddComponent<CanvasScaler>().uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        root.AddComponent<GraphicRaycaster>();
+        DontDestroyOnLoad(root);
+
+        _instance = root.AddComponent<CaptureMinigameUI>();
+        _instance.prefabRoot = root;
+        Debug.LogWarning("[CaptureMinigameUI] Prefab não encontrado (Resources/UI/CaptureMinigameCanvas). O minigame funcionará, mas sem visuais até você configurar o prefab.");
+        return _instance;
     }
 
     public void Begin(uint ghostNetId, int stageIndex, float speed, float markerPos01, float hitWindow01, Action<bool> onFinish)
     {
         this.ghostNetId = ghostNetId;
         this.stageIndex = stageIndex;
-        this.speed      = Mathf.Max(0.05f, speed);
-        this.marker     = Mathf.Clamp01(markerPos01);
-        this.window     = Mathf.Clamp(hitWindow01, 0.01f, 0.25f);
-        this.onFinish   = onFinish;
+        this.speed = Mathf.Max(0.05f, speed);
+        this.marker = Mathf.Clamp01(markerPos01);
+        this.window = Mathf.Clamp(hitWindow01, 0.01f, 0.25f);
+        this.onFinish = onFinish;
 
         this.handle = 0f;
         this.active = true;
 
-        var sw = Screen.width; var sh = Screen.height;
-        rect = new Rect((sw - W)/2f, sh*0.75f - H/2f, W, H); // parte baixa da tela
+        if (infoText) infoText.text = $"Stage {stageIndex} • Pressione Interact no alvo";
+        UpdateStaticVisuals();
+        Show(true);
     }
 
     public void Strike()
@@ -56,52 +86,85 @@ public class CaptureMinigameUI : MonoBehaviour
         Finish(ok);
     }
 
-    void Finish(bool ok)
-    {
-        active = false;
-        onFinish?.Invoke(ok);
-    }
-
     void Update()
     {
         if (!active) return;
-        handle += speed * Time.deltaTime;
-        if (handle >= 1f) handle -= 1f; // volta ao início
+
+        handle += speed * Time.unscaledDeltaTime;
+        if (handle >= 1f) handle -= 1f;
+
+        UpdateHandle();
     }
 
-    void OnGUI()
+    // ---------- helpers de UI
+
+    void Finish(bool ok)
     {
-        if (!active) return;
+        active = false;
+        Show(false);
+        onFinish?.Invoke(ok);
+    }
 
-        GUI.depth = 0;
-        GUI.Box(rect, GUIContent.none);
+    void Show(bool v)
+    {
+        if (!prefabRoot && this is { }) prefabRoot = transform.root.gameObject;
+        var rootGO = prefabRoot ? prefabRoot : gameObject;
 
-        // margem interna
-        var inner = new Rect(rect.x + 12, rect.y + 24, rect.width - 24, 18);
+        var cg = rootGO.GetComponent<CanvasGroup>();
+        if (!cg) cg = rootGO.AddComponent<CanvasGroup>();
+        cg.alpha = v ? 1f : 0f;
+        cg.interactable = v;
+        cg.blocksRaycasts = v;
 
-        // fundo
-        GUI.Box(inner, GUIContent.none);
+        // mantém o MonoBehaviour habilitado enquanto ativo
+        enabled = v;
+    }
 
-        // marker
-        float mx = inner.x + inner.width * marker;
-        var markRect = new Rect(mx - 2, inner.y - 6, 4, inner.height + 12);
-        GUI.Box(markRect, GUIContent.none);
+    void HideImmediate()
+    {
+        if (!prefabRoot && this is { }) prefabRoot = transform.root.gameObject;
+        var rootGO = prefabRoot ? prefabRoot : gameObject;
+        var cg = rootGO.GetComponent<CanvasGroup>();
+        if (!cg) cg = rootGO.AddComponent<CanvasGroup>();
+        cg.alpha = 0f; cg.interactable = false; cg.blocksRaycasts = false;
+        enabled = false;
+        active = false;
+    }
 
-        // janela de acerto (visual)
-        float wx = inner.width * window;
-        var winRect = new Rect(mx - wx, inner.y, wx*2f, inner.height);
-        Color prev = GUI.color; GUI.color = new Color(0f,1f,0f,0.25f);
-        GUI.DrawTexture(winRect, Texture2D.whiteTexture);
-        GUI.color = prev;
+    void UpdateStaticVisuals()
+    {
+        if (!barArea) return;
 
-        // handle
-        float hx = inner.x + inner.width * handle;
-        var hRect = new Rect(hx - 6, inner.y - 4, 12, inner.height + 8);
-        GUI.Box(hRect, GUIContent.none);
+        // Marker: ancora exatamente em X=marker
+        if (markerRT)
+        {
+            markerRT.anchorMin = new Vector2(marker, 0.5f);
+            markerRT.anchorMax = new Vector2(marker, 0.5f);
+            markerRT.anchoredPosition = Vector2.zero;
+        }
 
-        // texto
-        var tRect = new Rect(rect.x, rect.y + 54, rect.width, 24);
-        GUI.Label(tRect, $"Stage {stageIndex} • Pressione Interact no alvo");
+        // Window (Image) ocupa [marker-window, marker+window]
+        if (hitWindowImage)
+        {
+            var rt = hitWindowImage.rectTransform;
+            float a = Mathf.Clamp01(marker - window);
+            float b = Mathf.Clamp01(marker + window);
+            rt.anchorMin = new Vector2(a, 0.5f);
+            rt.anchorMax = new Vector2(b, 0.5f);
+            rt.anchoredPosition = Vector2.zero;
+            // largura controlada pelas âncoras; preserva altura do prefab
+            rt.sizeDelta = new Vector2(0f, rt.sizeDelta.y);
+        }
+
+        // Handle começa no 0
+        UpdateHandle();
+    }
+
+    void UpdateHandle()
+    {
+        if (!handleRT || !barArea) return;
+        handleRT.anchorMin = new Vector2(handle, 0.5f);
+        handleRT.anchorMax = new Vector2(handle, 0.5f);
+        handleRT.anchoredPosition = Vector2.zero;
     }
 }
-
