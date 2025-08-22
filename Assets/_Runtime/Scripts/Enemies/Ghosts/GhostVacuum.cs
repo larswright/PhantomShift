@@ -1,6 +1,8 @@
 using Mirror;
 using UnityEngine;
 using UnityEngine.AI;
+using System.Linq;
+using System.Collections.Generic;
 
 /// <summary>
 /// Lógica servidor da captura por Vacuum (progresso, travamento do fantasma).
@@ -21,6 +23,7 @@ public class GhostVacuum : NetworkBehaviour
     [SyncVar(hook = nameof(OnCapturingChanged))] private bool capturing;
     [SyncVar(hook = nameof(OnProgressChanged))]  private float progress01; // 0..1
     [SyncVar] private uint capturingPlayerNetId;
+    [SyncVar] private bool waitingMinigame;
 
     // ---- refs
     private GhostCaptureable cap;
@@ -29,6 +32,14 @@ public class GhostVacuum : NetworkBehaviour
     private GhostArchetype arch;
 
     // ---- auxiliares servidor
+
+    // ---- Novo: controle de minigame/checkpoints
+    private int nextRoundIndex;               // 0..mg_rounds-1
+    private float[] checkpoints;              // frações 0..1 (ex.: 0.33, 0.66, 0.99)
+    private float failPenalty01;              // fração a remover em falha
+    private float[] roundSpeed;
+    private float[] roundWidth;
+    private int[]   roundAttempts;
 
     public override void OnStartServer()
     {
@@ -45,6 +56,8 @@ public class GhostVacuum : NetworkBehaviour
         {
             if (secondsToCapture <= 0f) secondsToCapture = 4f;
         }
+
+        SetupMinigameFromArchetype();
     }
 
     GhostArchetype GetArchetypeSafely()
@@ -62,25 +75,28 @@ public class GhostVacuum : NetworkBehaviour
     {
         if (!cap || !ghost) return;
 
-        // Começa somente se estava stunnado
+        // precisa estar em modo de captura (já previsto no código original):
         if (!capturing)
         {
-            if (!cap.IsStunned()) return;                // precisa estar stunnado
-            StartCapturing(playerNetId);                 // 1. Ao começar a sugar...
-            cap.ServerForceExitStunKeepFrozen();         // 1.5 zera o stun, porém mantém parado
+            if (!cap.IsStunned()) return; // requer stun prévio
+            StartCapturing(playerNetId);
+            cap.ServerForceExitStunKeepFrozen();
         }
 
-        // Uma vez capturando, trava o "dono"
+        // somente o "dono" avança
         if (capturingPlayerNetId != playerNetId) return;
+
+        // Se aguardando minigame, ignora progresso
+        if (waitingMinigame) return;
 
         // Avança progresso
         progress01 = Mathf.Clamp01(progress01 + (dt / Mathf.Max(0.01f, secondsToCapture)));
 
-        // Captura completa
-        if (progress01 >= 1f)
-        {
+        // Ao cruzar próximo checkpoint, pausa e dispara minigame
+        TryEnterMinigameIfNeeded();
+
+        if (progress01 >= 1f && !waitingMinigame)
             CompleteCapture();
-        }
     }
 
     // ============== Internals ==============
@@ -104,6 +120,101 @@ public class GhostVacuum : NetworkBehaviour
 
         // Aqui você pode tocar VFX/SFX, soltar loot etc.
         NetworkServer.Destroy(gameObject); // remove o fantasma capturado
+    }
+
+    void SetupMinigameFromArchetype()
+    {
+        // defaults robustos
+        int rounds = arch ? Mathf.Clamp(arch.mg_rounds, 1, 3) : 3;
+        checkpoints = new float[rounds];
+        for (int i = 0; i < rounds; i++)
+            checkpoints[i] = (i + 1) / (float)(rounds + 0);
+
+        failPenalty01 = arch ? Mathf.Clamp01(arch.mg_failPenalty) : 0.12f;
+
+        // arrays por round (fallback em caso de tamanhos incompatíveis)
+        roundSpeed    = BuildRoundArray(arch?.mg_markerSpeed, rounds, 1.6f);
+        roundWidth    = BuildRoundArray(arch?.mg_windowWidth, rounds, 0.18f);
+        roundAttempts = BuildRoundArray(arch?.mg_attempts, rounds, 1);
+        nextRoundIndex = 0;
+    }
+
+    static float[] BuildRoundArray(float[] src, int count, float defVal)
+    {
+        var a = new float[count];
+        for (int i = 0; i < count; i++)
+            a[i] = (src != null && i < src.Length) ? src[i] : defVal;
+        return a;
+    }
+    static int[] BuildRoundArray(int[] src, int count, int defVal)
+    {
+        var a = new int[count];
+        for (int i = 0; i < count; i++)
+            a[i] = (src != null && i < src.Length) ? Mathf.Max(1, src[i]) : defVal;
+        return a;
+    }
+
+    [Server]
+    void TryEnterMinigameIfNeeded()
+    {
+        if (nextRoundIndex >= (checkpoints?.Length ?? 0)) return;
+        float target = checkpoints[nextRoundIndex];
+        if (progress01 + 1e-4f >= target) // margem
+        {
+            waitingMinigame = true;
+
+            // congela novamente para segurança
+            ghost.ServerSetExternalControl(true);
+            agent.ResetPath();
+            agent.velocity = Vector3.zero;
+
+            // TargetRPC para o jogador dono
+            var ownerConn = GetOwnerConnection();
+            if (ownerConn != null)
+            {
+                var bridge = ownerConn.identity.GetComponent<PlayerMinigameBridge>();
+                if (bridge)
+                {
+                    bridge.Target_StartMinigame(ownerConn, netIdentity.netId,
+                        roundSpeed[nextRoundIndex],
+                        roundWidth[nextRoundIndex],
+                        roundAttempts[nextRoundIndex],
+                        1 // requiredSuccesses
+                    );
+                }
+            }
+        }
+    }
+
+    NetworkConnectionToClient GetOwnerConnection()
+    {
+        if (!NetworkServer.spawned.TryGetValue(capturingPlayerNetId, out var id)) return null;
+        return id.connectionToClient;
+    }
+
+    // ===== resultado vindo do cliente =====
+    [Server]
+    public void ServerOnMinigameResult(uint senderPlayerNetId, bool success)
+    {
+        // só aceita do dono
+        if (senderPlayerNetId != capturingPlayerNetId) return;
+        if (!waitingMinigame) return;
+
+        if (!success)
+        {
+            // penaliza e clampa
+            progress01 = Mathf.Max(0f, progress01 - failPenalty01);
+        }
+
+        waitingMinigame = false;
+        nextRoundIndex = Mathf.Min(nextRoundIndex + 1, (checkpoints?.Length ?? 0));
+
+        // libera movimento "travado" sob nosso controle (continua travado enquanto capturando)
+        ghost.ServerSetExternalControl(true);
+
+        // Se já tinha atingido 100%, finalize agora
+        if (progress01 >= 1f)
+            CompleteCapture();
     }
 
     // ============== Hooks replicação (UI local etc.) ==============
