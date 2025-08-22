@@ -30,10 +30,11 @@ public class Ghost : NetworkBehaviour
     void ApplyConfig()
     {
         if (!agent || archetype == null) return;
-        agent.speed = archetype.moveSpeed;
-        agent.acceleration = archetype.acceleration;
-        agent.angularSpeed = archetype.angularSpeed;
-        agent.stoppingDistance = archetype.stoppingDistance;
+        var s = archetype.defaultStats;
+        agent.speed = s.moveSpeed;
+        agent.acceleration = s.acceleration;
+        agent.angularSpeed = s.angularSpeed;
+        agent.stoppingDistance = s.stoppingDistance;
         agent.areaMask = archetype.areaMask;
         agent.autoRepath = true;
         agent.obstacleAvoidanceType = ObstacleAvoidanceType.HighQualityObstacleAvoidance;

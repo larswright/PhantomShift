@@ -18,8 +18,6 @@ public class GhostCaptureable : NetworkBehaviour
     public float fleeDecisionInterval = 0.25f;
     public Vector2 fleeStepRange = new Vector2(1.5f, 3.5f);
     public float fleeRadius = 10f;
-    public AnimationCurve escapeCurve = AnimationCurve.EaseInOut(0,0,1,1);
-    public AnimationCurve stunCurve   = AnimationCurve.EaseInOut(0,1,1,0);
 
     [System.Serializable] public class FloatEvent : UnityEvent<float> {}
     public UnityEvent onFleeStart;
@@ -42,7 +40,6 @@ public class GhostCaptureable : NetworkBehaviour
     private float lastUVTime;
     private Vector3 lastOrigin;
     private Vector3 lastRayDir; // direção do feixe UV (XZ)
-    private float baseSpeed, baseAngular, baseAccel;
 
     public override void OnStartServer()
     {
@@ -51,9 +48,7 @@ public class GhostCaptureable : NetworkBehaviour
         if (!ghost) Debug.LogWarning("[GhostCaptureable] Ghost component missing", this);
         if (!agent) Debug.LogWarning("[GhostCaptureable] NavMeshAgent missing", this);
         ApplyConfig();
-        baseSpeed = agent.speed;
-        baseAngular = agent.angularSpeed;
-        baseAccel = agent.acceleration;
+        if (archetype) ApplyMotionStats(archetype.defaultStats, false);
     }
 
     void ApplyConfig()
@@ -65,31 +60,19 @@ public class GhostCaptureable : NetworkBehaviour
         fleeDecisionInterval = archetype.capture_fleeDecisionInterval;
         fleeStepRange = archetype.capture_fleeStepRange;
         fleeRadius = archetype.capture_fleeRadius;
-        escapeCurve = archetype.capture_escapeCurve;
-        stunCurve = archetype.capture_stunCurve;
     }
 
-    void SetFleeBoost(bool on)
+    void ApplyMotionStats(GhostArchetype.MotionStats stats, bool flee)
     {
         if (!agent) return;
-        if (on)
-        {
-            // velocidade e resposta agressivas
-            agent.speed = baseSpeed * (archetype ? Mathf.Max(1f, archetype.capture_fleeSpeedMultiplier) : 2.2f);
-            agent.angularSpeed = Mathf.Max(baseAngular, 900f);
-            agent.acceleration = Mathf.Max(baseAccel, 40f);
-            agent.autoBraking = false;
-            agent.obstacleAvoidanceType = ObstacleAvoidanceType.GoodQualityObstacleAvoidance; // menos suavização que High
-        }
-        else
-        {
-            agent.speed = baseSpeed;
-            agent.angularSpeed = baseAngular;
-            agent.acceleration = baseAccel;
-            agent.autoBraking = true;
-            // restaura o padrão do Ghost.ApplyConfig()
-            agent.obstacleAvoidanceType = ObstacleAvoidanceType.HighQualityObstacleAvoidance;
-        }
+        agent.speed = stats.moveSpeed;
+        agent.acceleration = stats.acceleration;
+        agent.angularSpeed = stats.angularSpeed;
+        agent.stoppingDistance = stats.stoppingDistance;
+        agent.autoBraking = !flee;
+        agent.obstacleAvoidanceType = flee
+            ? ObstacleAvoidanceType.GoodQualityObstacleAvoidance
+            : ObstacleAvoidanceType.HighQualityObstacleAvoidance;
     }
 
     [Server]
@@ -131,9 +114,8 @@ public class GhostCaptureable : NetworkBehaviour
     {
         if (fleeing || stunned) return;
         fleeing = true;
-        Debug.Log($"[GhostCaptureable] {name} fugindo da UV");
         ghost.ServerSetExternalControl(true);
-        SetFleeBoost(true);
+        if (archetype) ApplyMotionStats(archetype.fleeStats, true);
         fleeCo = StartCoroutine(FleeLoop());
     }
 
@@ -143,7 +125,7 @@ public class GhostCaptureable : NetworkBehaviour
         if (!fleeing) return;
         fleeing = false;
         ghost.ServerSetExternalControl(false);
-        SetFleeBoost(false);
+        if (archetype) ApplyMotionStats(archetype.defaultStats, false);
         if (fleeCo != null) StopCoroutine(fleeCo);
         fleeCo = null;
     }
@@ -166,9 +148,9 @@ public class GhostCaptureable : NetworkBehaviour
             // Escolhe o lado que aumenta |distância lateral| (afasta do eixo do feixe)
             Vector3 lateral = side >= 0f ? right : -right;
 
-            // Pequeno ruído apenas lateral (sem componente longitudinal)
+            // Ruído apenas lateral
             Vector3 rnd = Random.insideUnitSphere; rnd.y = 0f;
-            rnd -= Vector3.Project(rnd, d); // remove frente/trás
+            rnd -= Vector3.Project(rnd, d);
             rnd = Vector3.ClampMagnitude(rnd, 0.35f);
 
             float step = Random.Range(fleeStepRange.x, fleeStepRange.y);
@@ -177,8 +159,8 @@ public class GhostCaptureable : NetworkBehaviour
             if (Ghost.TryGetRandomPointOnNavmesh(target, fleeRadius, out var dest, agent.areaMask, 2f))
                 agent.SetDestination(dest);
 
-            float exposure01 = Mathf.Clamp01(exposureTimer / Mathf.Max(0.01f, uvSecondsToStun));
-            escapeIntensity = escapeCurve.Evaluate(exposure01);
+            // Intensidade linear 0..1 pela fração de exposição
+            escapeIntensity = Mathf.Clamp01(exposureTimer / Mathf.Max(0.01f, uvSecondsToStun));
 
             yield return new WaitForSeconds(fleeDecisionInterval);
         }
@@ -189,12 +171,11 @@ public class GhostCaptureable : NetworkBehaviour
     {
         if (stunned) return;
         stunned = true;
-        Debug.Log($"[GhostCaptureable] {name} foi atordoado pela UV");
         fleeing = false;
         ghost.ServerSetExternalControl(true);
-        SetFleeBoost(false);
         if (fleeCo != null) StopCoroutine(fleeCo);
         fleeCo = null;
+        if (archetype) ApplyMotionStats(archetype.defaultStats, false);
         stunCo = StartCoroutine(StunLoop());
     }
 
@@ -204,15 +185,16 @@ public class GhostCaptureable : NetworkBehaviour
         float end = Time.time + stunSeconds;
         while (Time.time < end)
         {
-            float t = 1f - ((end - Time.time) / Mathf.Max(0.01f, stunSeconds));
-            stunIntensity = stunCurve.Evaluate(t);
+            float t = 1f - ((end - Time.time) / Mathf.Max(0.01f, stunSeconds)); // 0..1 linear
+            stunIntensity = Mathf.Clamp01(t);
             yield return null;
         }
         stunned = false;
         ghost.ServerSetExternalControl(false);
         stunCo = null;
         exposureTimer = 0f;
-        Debug.Log($"[GhostCaptureable] {name} recuperou do stun");
+        // volta para os stats padrão ao sair do stun
+        if (archetype) ApplyMotionStats(archetype.defaultStats, false);
     }
 
     void OnFleeState(bool _, bool newVal)
