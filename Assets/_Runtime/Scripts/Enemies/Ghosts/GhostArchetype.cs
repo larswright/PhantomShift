@@ -1,7 +1,7 @@
 using UnityEngine;
 
 [CreateAssetMenu(menuName = "PhantomShift/Ghost Archetype")]
-public class GhostArchetype : ScriptableObject
+public partial class GhostArchetype : ScriptableObject
 {
     public enum Class { Weak, Possessor, Heavy }
     public Class ghostClass = Class.Weak;
@@ -22,4 +22,14 @@ public class GhostArchetype : ScriptableObject
     [Header("NavMesh")]
     public int areaMask = ~0; // todas as áreas
     public float sampleMaxDistance = 2.0f;
+
+    [Header("Capture (UV/Stun)")]
+    public float capture_uvSecondsToStun = 2.0f;
+    public float capture_stunSeconds = 3.0f;
+    public float capture_exposureGraceWindow = 0.6f;
+    public float capture_fleeDecisionInterval = 0.25f;
+    public Vector2 capture_fleeStepRange = new Vector2(1.5f, 3.5f);
+    public float capture_fleeRadius = 10f;
+    public AnimationCurve capture_escapeCurve = AnimationCurve.EaseInOut(0,0,1,1);
+    public AnimationCurve capture_stunCurve   = AnimationCurve.EaseInOut(0,1,1,0);
 }

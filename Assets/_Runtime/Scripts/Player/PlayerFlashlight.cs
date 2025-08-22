@@ -18,6 +18,13 @@ public class PlayerFlashlight : NetworkBehaviour
     [Tooltip("Duração (s) de cada carga da UV.")]
     public float secondsPerCharge = 12f;
 
+    [Header("UV Raycast")]
+    public Transform uvRayOrigin;
+    public float uvRayDistance = 10f;
+    public float uvRayRadius = 0.5f;
+    public float uvReportInterval = 0.1f;
+    public LayerMask uvLayerMask = ~0;
+
     // ===== Estado replicado =====
     [SyncVar(hook = nameof(OnNormalChanged))] private bool normalOn;
     [SyncVar(hook = nameof(OnUVChanged))] private bool uvOn;
@@ -33,6 +40,7 @@ public class PlayerFlashlight : NetworkBehaviour
 
     // ===== Helpers =====
     private float MaxUVSeconds => maxCharges * secondsPerCharge;
+    private float nextUVReportTime;
 
     void Reset()
     {
@@ -134,6 +142,38 @@ public class PlayerFlashlight : NetworkBehaviour
             {
                 uvOn = false;
                 StopDrainIfNeeded();
+            }
+        }
+    }
+
+    [Command]
+    void CmdUVHit(uint netId, Vector3 origin, float dt)
+    {
+        if (NetworkIdentity.spawned.TryGetValue(netId, out var id))
+        {
+            var cap = id.GetComponent<GhostCaptureable>();
+            if (cap)
+                cap.ServerApplyUVHit(origin, dt);
+        }
+    }
+
+    void Update()
+    {
+        if (!isLocalPlayer) return;
+        if (!uvOn) return;
+        if (!uvRayOrigin) return;
+        if (Time.time < nextUVReportTime) return;
+        nextUVReportTime = Time.time + uvReportInterval;
+
+        var ray = new Ray(uvRayOrigin.position, uvRayOrigin.forward);
+        if (Physics.SphereCast(ray, uvRayRadius, out var hit, uvRayDistance, uvLayerMask, QueryTriggerInteraction.Ignore))
+        {
+            var cap = hit.collider.GetComponentInParent<GhostCaptureable>();
+            if (cap)
+            {
+                var id = cap.netIdentity;
+                if (id)
+                    CmdUVHit(id.netId, uvRayOrigin.position, uvReportInterval);
             }
         }
     }
