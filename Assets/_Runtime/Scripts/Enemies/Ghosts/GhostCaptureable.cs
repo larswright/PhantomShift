@@ -211,4 +211,30 @@ public class GhostCaptureable : NetworkBehaviour
 
     void OnEscapeIntensity(float _, float newVal) => onEscapeIntensity?.Invoke(newVal);
     void OnStunIntensity(float _, float newVal)   => onStunIntensity?.Invoke(newVal);
+
+    // ====== ADIÇÕES SIMPLES (colar dentro de GhostCaptureable) ======
+
+    // Getters simples para outras classes
+    [Server] public bool IsStunned() => stunned;
+    public GhostArchetype GetArchetype() => archetype;
+
+    // Força sair do stun IMEDIATAMENTE, mantendo o fantasma travado.
+    // Útil quando começa a sucção: "zera o stun, mas mantenha parado".
+    [Server]
+    public void ServerForceExitStunKeepFrozen()
+    {
+        if (!stunned) return;
+
+        if (stunCo != null)
+        {
+            StopCoroutine(stunCo);
+            stunCo = null;
+        }
+
+        stunned = false;                       // dispara hook onStunEnd nos clientes
+        ghost.ServerSetExternalControl(true);  // permanece parado
+        if (archetype) ApplyMotionStats(archetype.defaultStats, false);
+        // zera acúmulo de exposição
+        exposureTimer = 0f;
+    }
 }
