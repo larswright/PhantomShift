@@ -150,14 +150,14 @@ public class PlayerFlashlight : NetworkBehaviour
     }
 
     [Command]
-    void CmdUVHit(uint netId, Vector3 origin, float dt)
+    void CmdUVHit(uint netId, Vector3 origin, Vector3 dir, float dt)
     {
         Debug.Log($"[PF][SV] Reportando UV no netId {netId} dt={dt:F2}");
         if (NetworkServer.spawned.TryGetValue(netId, out var identity))
         {
             var cap = identity.GetComponent<GhostCaptureable>();
             if (cap)
-                cap.ServerApplyUVHit(origin, dt);
+                cap.ServerApplyUVHit(origin, dir, dt);
         }
     }
 
@@ -183,7 +183,7 @@ public class PlayerFlashlight : NetworkBehaviour
                 {
                     if (Time.time >= nextUVReportTime)
                     {
-                        CmdUVHit(id.netId, uvRayOrigin.position, uvReportInterval);
+                        CmdUVHit(id.netId, uvRayOrigin.position, uvRayOrigin.forward, uvReportInterval);
                         nextUVReportTime = Time.time + uvReportInterval;
                     }
                 }

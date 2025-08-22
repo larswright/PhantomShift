@@ -9,8 +9,8 @@ public partial class GhostArchetype : ScriptableObject
     [Header("Stats")]
     public int maxHP = 100;
     public float moveSpeed = 3.6f;
-    public float acceleration = 30f;
-    public float angularSpeed = 720f;
+    public float acceleration = 40f;
+    public float angularSpeed = 900f;
     public float stoppingDistance = 0.2f;
 
     [Header("Wander")]
@@ -39,9 +39,9 @@ public partial class GhostArchetype : ScriptableObject
     public float capture_uvSecondsToStun = 2.0f;
     public float capture_stunSeconds = 3.0f;
     public float capture_exposureGraceWindow = 0.6f;
-    public float capture_fleeDecisionInterval = 0.25f;
-    public Vector2 capture_fleeStepRange = new Vector2(1.5f, 3.5f);
-    public float capture_fleeRadius = 10f;
+    public float capture_fleeDecisionInterval = 0.5f;
+    public Vector2 capture_fleeStepRange = new Vector2(8f, 15f);
+    public float capture_fleeRadius = 24f;
     public AnimationCurve capture_escapeCurve = AnimationCurve.EaseInOut(0,0,1,1);
     public AnimationCurve capture_stunCurve   = AnimationCurve.EaseInOut(0,1,1,0);
 

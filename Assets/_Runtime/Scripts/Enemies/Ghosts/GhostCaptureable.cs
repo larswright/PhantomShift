@@ -41,6 +41,7 @@ public class GhostCaptureable : NetworkBehaviour
     private float exposureTimer;
     private float lastUVTime;
     private Vector3 lastOrigin;
+    private Vector3 lastRayDir; // direção do feixe UV (XZ)
     private float baseSpeed, baseAngular, baseAccel;
 
     public override void OnStartServer()
@@ -92,7 +93,7 @@ public class GhostCaptureable : NetworkBehaviour
     }
 
     [Server]
-    public void ServerApplyUVHit(Vector3 origin, float dt)
+    public void ServerApplyUVHit(Vector3 origin, Vector3 dir, float dt)
     {
         float now = Time.time;
         if (now - lastUVTime > exposureGraceWindow)
@@ -100,19 +101,16 @@ public class GhostCaptureable : NetworkBehaviour
 
         lastUVTime = now;
         exposureTimer += dt;
+
         lastOrigin = origin;
+        lastRayDir  = new Vector3(dir.x, 0f, dir.z).normalized; // guarda a direção do feixe no plano
+
         Debug.Log($"[GhostCaptureable] {name} recebeu UV: {exposureTimer:F2}/{uvSecondsToStun:F2}s");
 
         if (!stunned)
         {
-            if (exposureTimer >= uvSecondsToStun)
-            {
-                StartStun();
-            }
-            else
-            {
-                StartFlee();
-            }
+            if (exposureTimer >= uvSecondsToStun) StartStun();
+            else StartFlee();
         }
     }
 
@@ -153,41 +151,36 @@ public class GhostCaptureable : NetworkBehaviour
     [Server]
     IEnumerator FleeLoop()
     {
-        float segMin = archetype ? archetype.capture_fleeSegmentDuration.x : 0.8f;
-        float segMax = archetype ? archetype.capture_fleeSegmentDuration.y : 1.4f;
-        float turnChance = archetype ? archetype.capture_hardTurnChance : 0.40f;
-        Vector2 turnDeg = archetype ? archetype.capture_hardTurnDegrees : new Vector2(60f, 140f);
-
         while (fleeing && !stunned)
         {
-            // direção base: afastar do UV
-            Vector3 dir = (transform.position - lastOrigin).normalized;
+            // Se não recebeu direção ainda, usa forward só para evitar zero.
+            Vector3 d = lastRayDir.sqrMagnitude > 0.0001f ? lastRayDir : transform.forward;
 
-            // vira seco aleatório para quebrar previsibilidade
-            if (Random.value < turnChance)
-            {
-                float deg = Random.Range(turnDeg.x, turnDeg.y) * (Random.value < 0.5f ? -1f : 1f);
-                dir = Quaternion.Euler(0f, deg, 0f) * dir;
-            }
+            // Vetor lateral (direita do feixe) no plano XZ; esquerda = -right
+            Vector3 right = new Vector3(d.z, 0f, -d.x);
 
-            // passo longo + ruído leve (evita “tremido”)
-            Vector3 random = Random.insideUnitSphere * 0.35f; random.y = 0f;
-            float step = Random.Range(fleeStepRange.x, fleeStepRange.y);  // do Archetype
-            Vector3 target = transform.position + (dir + random).normalized * step;
+            // Fantasma está à direita (+) ou à esquerda (-) do eixo do feixe?
+            Vector3 v = transform.position - lastOrigin;
+            float side = Vector3.Dot(v, right);
+
+            // Escolhe o lado que aumenta |distância lateral| (afasta do eixo do feixe)
+            Vector3 lateral = side >= 0f ? right : -right;
+
+            // Pequeno ruído apenas lateral (sem componente longitudinal)
+            Vector3 rnd = Random.insideUnitSphere; rnd.y = 0f;
+            rnd -= Vector3.Project(rnd, d); // remove frente/trás
+            rnd = Vector3.ClampMagnitude(rnd, 0.35f);
+
+            float step = Random.Range(fleeStepRange.x, fleeStepRange.y);
+            Vector3 target = transform.position + (lateral + rnd).normalized * step;
 
             if (Ghost.TryGetRandomPointOnNavmesh(target, fleeRadius, out var dest, agent.areaMask, 2f))
-                agent.SetDestination(dest);  // define e mantém
+                agent.SetDestination(dest);
 
-            // mantém o destino por toda a duração do segmento (sem retarget)
-            float end = Time.time + Random.Range(segMin, segMax);
-            while (Time.time < end && fleeing && !stunned)
-            {
-                float exposure01 = Mathf.Clamp01(exposureTimer / Mathf.Max(0.01f, uvSecondsToStun));
-                escapeIntensity = escapeCurve.Evaluate(exposure01);
-                // sai cedo se já chegou
-                if (!agent.pathPending && agent.remainingDistance <= agent.stoppingDistance + 0.1f) break;
-                yield return null;
-            }
+            float exposure01 = Mathf.Clamp01(exposureTimer / Mathf.Max(0.01f, uvSecondsToStun));
+            escapeIntensity = escapeCurve.Evaluate(exposure01);
+
+            yield return new WaitForSeconds(fleeDecisionInterval);
         }
     }
 
