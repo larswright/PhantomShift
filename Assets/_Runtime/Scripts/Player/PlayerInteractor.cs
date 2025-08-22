@@ -45,7 +45,7 @@ public class PlayerInteractor : NetworkBehaviour, InputSystem_Actions.IPlayerAct
 
     private void Update()
     {
-        if (!hasAuthority) return;
+        if (!isOwned) return;
 
         var cam = playerCamera != null ? playerCamera : Camera.main;
         if (cam == null) return;
@@ -70,7 +70,7 @@ public class PlayerInteractor : NetworkBehaviour, InputSystem_Actions.IPlayerAct
 
     public void OnInteract(InputAction.CallbackContext ctx)
     {
-        if (!hasAuthority) return;
+        if (!isOwned) return;
 
         if (ctx.performed && currentTarget != null)
         {

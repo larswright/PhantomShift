@@ -308,24 +308,20 @@ MonoBehaviour:
   m_GameObject: {fileID: 3806144520915820610}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 30ac92e363264a0e918b391b74d07b8d, type: 3}
+  m_Script: {fileID: 11500000, guid: 6b018bdafc604878a050ab03d04a9b49, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerInteractor
   syncDirection: 0
   syncMode: 0
   syncInterval: 0
-  cam: {fileID: 7802847976589841661}
-  camRoot: {fileID: 5611595459388793733}
-  interactRange: 3
-  maxAimAngle: 8
+  playerCamera: {fileID: 7802847976589841661}
+  interactDistance: 3
+  interactableLayer:
+    serializedVersion: 2
+    m_Bits: 128
   ignoreLayers:
     serializedVersion: 2
     m_Bits: 64
-  interactableLayers:
-    serializedVersion: 2
-    m_Bits: 128
-  debugLogs: 1
-  drawDebug: 1
 --- !u!114 &4065653128202712775
 MonoBehaviour:
   m_ObjectHideFlags: 0

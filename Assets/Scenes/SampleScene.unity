@@ -351,7 +351,7 @@ GameObject:
   - component: {fileID: 711111709}
   - component: {fileID: 711111708}
   - component: {fileID: 711111707}
-  - component: {fileID: 711111706}
+  - component: {fileID: 711111712}
   m_Layer: 7
   m_Name: Battery
   m_TagString: Interactable
@@ -359,23 +359,6 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &711111706
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 711111705}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 9bfea8fadaa544f58ab30db64829ec5f, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Battery
-  syncDirection: 0
-  syncMode: 0
-  syncInterval: 0
-  pickedMessage: Battery picked.
-  maxServerDistance: 3.2
 --- !u!114 &711111707
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -479,12 +462,30 @@ Transform:
   m_GameObject: {fileID: 711111705}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -7.79, y: 0.89, z: 12.53}
-  m_LocalScale: {x: 2, y: 2, z: 2}
+  m_LocalPosition: {x: -7.79, y: 0.44, z: 12.53}
+  m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 1
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &711111712
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 711111705}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d34a80f6bd6b9bc4dab25ee4e3377a42, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BatteryPickup
+  syncDirection: 0
+  syncMode: 0
+  syncInterval: 0
+  chargesToAdd: 1
+  consumeEvenIfFull: 0
+  interactText: Pegar Bateria
 --- !u!1 &1160234425
 GameObject:
   m_ObjectHideFlags: 0
