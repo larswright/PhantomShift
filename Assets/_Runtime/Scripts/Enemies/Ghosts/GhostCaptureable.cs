@@ -79,9 +79,7 @@ public class GhostCaptureable : NetworkBehaviour
     public void ServerApplyUVHit(Vector3 origin, Vector3 dir, float dt)
     {
         float now = Time.time;
-        if (now - lastUVTime > exposureGraceWindow)
-            exposureTimer = 0f;
-
+        // Previous logic reset exposureTimer here, but Update() already handles the grace window.
         lastUVTime = now;
         exposureTimer += dt;
 

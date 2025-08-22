@@ -35,6 +35,7 @@ public class GhostVacuum : NetworkBehaviour
 
     // ---- auxiliares servidor
     private float[] stageThresholds = new float[] { 0.33f, 0.66f, 0.99f };
+    private int completedMinigameStage = 0;
 
     public override void OnStartServer()
     {
@@ -117,6 +118,7 @@ public class GhostVacuum : NetworkBehaviour
 
         // Sucesso: limpa o "await" e segue sugando
         awaitingStage = 0;
+        completedMinigameStage = stageIndex;
     }
 
     // ============== Internals ==============
@@ -126,6 +128,7 @@ public class GhostVacuum : NetworkBehaviour
     {
         capturing = true;
         capturingPlayerNetId = playerNetId;
+        completedMinigameStage = 0;
 
         // congela movimento e zera velocidade instantaneamente
         ghost.ServerSetExternalControl(true);
@@ -144,7 +147,7 @@ public class GhostVacuum : NetworkBehaviour
             if (awaitingStage != 0) break; // já aguardando
             float thr = stageThresholds[i - 1];
             // Dispara quando cruzar o threshold (>=), sem repetir
-            if (progress01 >= thr)
+            if (progress01 >= thr && i > completedMinigameStage)
             {
                 awaitingStage = i;
                 BeginMinigame(i);
@@ -195,6 +198,7 @@ public class GhostVacuum : NetworkBehaviour
         awaitingStage = 0;
         progress01 = 0f;
         capturingPlayerNetId = 0;
+        completedMinigameStage = 0;
 
         // Libera controle para IA voltar a andar
         ghost.ServerSetExternalControl(false);
