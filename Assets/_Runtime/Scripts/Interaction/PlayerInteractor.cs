@@ -26,6 +26,8 @@ public class PlayerInteractor : NetworkBehaviour
     // Cache de máscara efetiva para raycast (inverso das ignoradas)
     int raycastMask;
 
+    public const string InteractableTag = "Interactable";
+
     void Reset()
     {
         if (!cam) cam = GetComponentInChildren<Camera>(true);
@@ -79,6 +81,12 @@ public class PlayerInteractor : NetworkBehaviour
             float angle = Vector3.Angle(dir, (hit.point - origin));
             if (angle > maxAimAngle) return;
 
+            if (!hit.collider.CompareTag(InteractableTag))
+            {
+                Debug.Log($"Hit {hit.collider.name} without tag {InteractableTag}");
+                return;
+            }
+
             var ni = hit.collider.GetComponentInParent<NetworkIdentity>();
             if (!ni) return;
 
@@ -86,6 +94,7 @@ public class PlayerInteractor : NetworkBehaviour
             var interactable = ni.GetComponent<IInteractable>();
             if (interactable == null) return;
 
+            Debug.Log($"Attempting interaction with {ni.name}");
             // Envia pedido ao servidor
             CmdTryInteract(ni);
         }
@@ -95,6 +104,8 @@ public class PlayerInteractor : NetworkBehaviour
     void CmdTryInteract(NetworkIdentity targetNi)
     {
         if (!targetNi) return;
+
+        Debug.Log($"Server processing interaction with {targetNi.name}");
 
         // Validações básicas no servidor (anti-lag/anti-cheat leve)
         Transform head = camRoot ? camRoot : transform;
