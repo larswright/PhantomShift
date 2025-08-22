@@ -46,6 +46,8 @@ public class GhostCaptureable : NetworkBehaviour
     {
         ghost = GetComponent<Ghost>();
         agent = GetComponent<NavMeshAgent>();
+        if (!ghost) Debug.LogWarning("[GhostCaptureable] Ghost component missing", this);
+        if (!agent) Debug.LogWarning("[GhostCaptureable] NavMeshAgent missing", this);
         ApplyConfig();
     }
 
@@ -92,6 +94,8 @@ public class GhostCaptureable : NetworkBehaviour
     {
         if (!stunned && Time.time - lastUVTime > exposureGraceWindow)
         {
+            if (exposureTimer > 0f)
+                Debug.Log($"[GhostCaptureable] {name} perdeu exposição de UV");
             exposureTimer = 0f;
             StopFlee();
         }
