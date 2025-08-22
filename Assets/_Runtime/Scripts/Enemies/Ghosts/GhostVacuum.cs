@@ -199,6 +199,8 @@ public class GhostVacuum : NetworkBehaviour
 
         if (!success)
         {
+            progress01 = 0f;
+            nextRoundIndex = 0;
             waitingMinigame = false;
             capturing = false;
             capturingPlayerNetId = 0;
