@@ -11,13 +11,20 @@ public class Ghost : NetworkBehaviour
 
     private NavMeshAgent agent;
     private bool externalControl;
+    private float baseSpeed;
+    private int zigSign = 1;
 
     public override void OnStartServer()
     {
         base.OnStartServer();
         agent = GetComponent<NavMeshAgent>();
         ApplyConfig();
-        StartCoroutine(WanderLoop());
+        baseSpeed = agent.speed;
+        // Escolhe o loop conforme o archetype
+        if (archetype && archetype.erratic)
+            StartCoroutine(ErraticLoop());
+        else
+            StartCoroutine(WanderLoop());
     }
 
     void ApplyConfig()
@@ -44,6 +51,84 @@ public class Ghost : NetworkBehaviour
                 a.ResetPath();
                 a.velocity = Vector3.zero;
             }
+        }
+    }
+
+    [ServerCallback]
+    private IEnumerator ErraticLoop()
+    {
+        // Fallbacks se archetype não setado
+        float zigStep = archetype ? archetype.zigStep : 2.0f;
+        float zigAmp  = archetype ? archetype.zigAmplitude : 2.0f;
+        Vector2 period = archetype ? archetype.zigPeriodRange : new Vector2(0.2f, 0.45f);
+        float hardTurnChance = archetype ? archetype.hardTurnChance : 0.35f;
+        float hardTurnDeg    = archetype ? archetype.hardTurnDegrees : 90f;
+        float burstChance    = archetype ? archetype.burstChance : 0.25f;
+        float burstMul       = archetype ? archetype.burstMultiplier : 1.8f;
+        Vector2 burstDur     = archetype ? archetype.burstDurationRange : new Vector2(0.25f, 0.6f);
+
+        float sampleMax = archetype ? archetype.sampleMaxDistance : 2f;
+        float radius    = archetype ? archetype.wanderRadius : 10f;
+
+        while (true)
+        {
+            if (externalControl)
+            {
+                yield return null;
+                continue;
+            }
+
+            // Direção base: usa velocidade atual ou forward
+            Vector3 fwd = (agent && agent.velocity.sqrMagnitude > 0.1f)
+                ? agent.velocity.normalized
+                : transform.forward;
+
+            // Lateral direita (perpendicular no plano XZ)
+            Vector3 right = new Vector3(fwd.z, 0f, -fwd.x);
+
+            // Alterna lado a cada decisão (zig-zag)
+            zigSign = -zigSign;
+
+            // Offset lateral com amplitude variável
+            float lateral = Random.Range(0.3f * zigAmp, zigAmp) * zigSign;
+
+            // Chance de virar "seco" (hard turn)
+            if (Random.value < hardTurnChance)
+            {
+                float signed = (Random.value < 0.5f ? -1f : 1f) * hardTurnDeg;
+                fwd = Quaternion.Euler(0f, signed, 0f) * fwd;
+            }
+
+            // Alvo curto à frente + deslocamento lateral
+            Vector3 target = transform.position + (fwd * zigStep) + (right * lateral);
+
+            // Projeta no NavMesh e define destino
+            if (TryGetRandomPointOnNavmesh(target, radius, out var dest, agent.areaMask, sampleMax))
+                agent.SetDestination(dest);
+
+            // Sprint ocasional
+            bool didBurst = false;
+            if (Random.value < burstChance)
+            {
+                didBurst = true;
+                float dur = Random.Range(burstDur.x, burstDur.y);
+                float prev = agent.speed;
+                agent.speed = baseSpeed * burstMul;
+                float end = Time.time + dur;
+                while (Time.time < end)
+                {
+                    if (externalControl) break;
+                    yield return null;
+                }
+                agent.speed = prev;
+            }
+
+            // Janela curta entre decisões (mais “nervoso”)
+            float wait = Random.Range(period.x, period.y);
+            if (!didBurst)
+                yield return new WaitForSeconds(wait);
+            else
+                yield return null; // já “ocupou” tempo no burst
         }
     }
 

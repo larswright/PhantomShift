@@ -8,9 +8,9 @@ public partial class GhostArchetype : ScriptableObject
 
     [Header("Stats")]
     public int maxHP = 100;
-    public float moveSpeed = 3.0f;
-    public float acceleration = 8f;
-    public float angularSpeed = 240f;
+    public float moveSpeed = 3.6f;
+    public float acceleration = 30f;
+    public float angularSpeed = 720f;
     public float stoppingDistance = 0.2f;
 
     [Header("Wander")]
@@ -18,6 +18,18 @@ public partial class GhostArchetype : ScriptableObject
     public float pathRecalcDistance = 0.6f;
     public Vector2 idlePauseRange = new Vector2(0.5f, 1.5f);
     public Vector2 roamIntervalRange = new Vector2(2f, 4f);
+
+    [Header("Erratic Motion")]
+    public bool erratic = true;
+    [Min(0.5f)] public float zigStep = 2.0f;                 // avanço por decisão
+    [Min(0.0f)] public float zigAmplitude = 2.0f;            // deslocamento lateral
+    public Vector2 zigPeriodRange = new Vector2(0.20f, 0.45f); // intervalo entre decisões
+    [Range(0f,1f)] public float hardTurnChance = 0.35f;      // chance de virar "seco" 90°
+    public float hardTurnDegrees = 90f;                      // ângulo da virada dura
+
+    [Range(0f,1f)] public float burstChance = 0.25f;         // chance de "sprint"
+    public float burstMultiplier = 1.8f;                      // multiplicador do sprint
+    public Vector2 burstDurationRange = new Vector2(0.25f, 0.6f); // duração do sprint
 
     [Header("NavMesh")]
     public int areaMask = ~0; // todas as áreas
