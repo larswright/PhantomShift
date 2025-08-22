@@ -149,6 +149,7 @@ public class PlayerFlashlight : NetworkBehaviour
     [Command]
     void CmdUVHit(uint netId, Vector3 origin, float dt)
     {
+        Debug.Log($"[PlayerFlashlight] Reportando UV no netId {netId}");
         if (NetworkServer.spawned.TryGetValue(netId, out var identity))
         {
             var cap = identity.GetComponent<GhostCaptureable>();
@@ -169,9 +170,11 @@ public class PlayerFlashlight : NetworkBehaviour
         var ray = new Ray(uvRayOrigin.position, uvRayOrigin.forward);
         if (Physics.SphereCast(ray, uvRayRadius, out var hit, uvRayDistance, uvLayerMask, QueryTriggerInteraction.Ignore))
         {
+            Debug.Log($"[PlayerFlashlight] UV apontando para {hit.collider.name}");
             var cap = hit.collider.GetComponentInParent<GhostCaptureable>();
             if (cap)
             {
+                Debug.Log($"[PlayerFlashlight] UV atingiu fantasma {cap.name}");
                 var id = cap.netIdentity;
                 if (id)
                     CmdUVHit(id.netId, uvRayOrigin.position, uvReportInterval);
