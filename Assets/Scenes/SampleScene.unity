@@ -1202,9 +1202,6 @@ MonoBehaviour:
   syncMode: 0
   syncInterval: 0
   secondsToCapture: 0
-  minigameCount: -1
-  minigameHandleSpeed: 0
-  minigameHitWindow: 0
   onProgress:
     m_PersistentCalls:
       m_Calls: []
