@@ -1,0 +1,51 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: UV
+  m_Shader: {fileID: 4800000, guid: a1017c01f876d8942a3c210f20fbb0d9, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs: []
+    m_Ints: []
+    m_Floats:
+    - _Alpha: 0.7
+    - _Anisotropy: 0.6
+    - _AttenRadius: 6
+    - _AxialPow: 7.77
+    - _BaseAlpha: 0.04
+    - _ConeLength: 12
+    - _DepthFadeScale: 2.64
+    - _EdgeMin: 0
+    - _EdgePower: 8
+    - _EdgeSoftness: 9.03
+    - _Intensity: 24.4
+    - _LengthFade: 0.911
+    - _NoiseAmp: 0.12
+    - _NoiseScale: 2
+    - _NoiseSpeed: 1.5
+    - _RadialSharpness: 6.57
+    - _RadiusOverLength: 0.16
+    - _UseWorldSource: 0
+    m_Colors:
+    - _Color: {r: 0.9197812, g: 0, b: 1, a: 1}
+    - _SourcePos: {r: 0, g: 0, b: 0, a: 1}
+    - _Tint: {r: 1, g: 1, b: 1, a: 1}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1
