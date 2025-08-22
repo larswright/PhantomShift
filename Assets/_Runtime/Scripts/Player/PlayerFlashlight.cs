@@ -167,27 +167,38 @@ public class PlayerFlashlight : NetworkBehaviour
         if (!isLocalPlayer) { Debug.Log("[PF] !isLocalPlayer"); return; }
         if (!uvOn)          { Debug.Log("[PF] UV OFF no cliente"); return; }
         if (!uvRayOrigin)   { Debug.Log("[PF] uvRayOrigin nulo"); return; }
-        if (Time.time < nextUVReportTime) return;
-        nextUVReportTime = Time.time + uvReportInterval;
 
         var ray = new Ray(uvRayOrigin.position, uvRayOrigin.forward);
-        Debug.DrawRay(ray.origin, ray.direction * uvRayDistance, Color.magenta, 0.1f);
+        Debug.DrawRay(ray.origin, ray.direction * uvRayDistance, Color.magenta);
+
         if (Physics.SphereCast(ray, uvRayRadius, out var hit, uvRayDistance, uvLayerMask, QueryTriggerInteraction.Collide))
         {
-            Debug.Log($"[PF] UV apontando para {hit.collider.name}");
+            Debug.Log($"[PF] UV colidindo com {hit.collider.name}");
             var cap = hit.collider.GetComponentInParent<GhostCaptureable>();
             if (cap)
             {
                 Debug.Log($"[PF] UV atingiu fantasma {cap.name}");
                 var id = cap.netIdentity;
-                if (id) CmdUVHit(id.netId, uvRayOrigin.position, uvReportInterval);
-                else     Debug.LogWarning("[PF] Ghost sem NetworkIdentity");
+                if (id)
+                {
+                    if (Time.time >= nextUVReportTime)
+                    {
+                        CmdUVHit(id.netId, uvRayOrigin.position, uvReportInterval);
+                        nextUVReportTime = Time.time + uvReportInterval;
+                    }
+                }
+                else Debug.LogWarning("[PF] Ghost sem NetworkIdentity");
             }
-            else Debug.LogWarning("[PF] Collider sem GhostCaptureable no parent");
+            else if (Time.time >= nextUVReportTime)
+            {
+                Debug.LogWarning("[PF] Collider sem GhostCaptureable no parent");
+                nextUVReportTime = Time.time + uvReportInterval;
+            }
         }
-        else
+        else if (Time.time >= nextUVReportTime)
         {
-            Debug.Log("[PF] SphereCast não encontrou nada");
+            Debug.Log("[PF] UV não colidiu com nada");
+            nextUVReportTime = Time.time + uvReportInterval;
         }
     }
 
