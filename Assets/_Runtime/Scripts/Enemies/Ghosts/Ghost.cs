@@ -11,6 +11,7 @@ public class Ghost : NetworkBehaviour
     [SerializeField] private GhostArchetype archetype;
 
     private NavMeshAgent agent;
+    private bool externalControl;
 
     public override void OnStartServer()
     {
@@ -32,6 +33,21 @@ public class Ghost : NetworkBehaviour
         agent.obstacleAvoidanceType = ObstacleAvoidanceType.HighQualityObstacleAvoidance;
     }
 
+    [Server]
+    public void ServerSetExternalControl(bool enable)
+    {
+        externalControl = enable;
+        if (enable)
+        {
+            var a = GetComponent<NavMeshAgent>();
+            if (a)
+            {
+                a.ResetPath();
+                a.velocity = Vector3.zero;
+            }
+        }
+    }
+
     [ServerCallback]
     private IEnumerator WanderLoop()
     {
@@ -42,19 +58,27 @@ public class Ghost : NetworkBehaviour
 
         while (true)
         {
+            // respeita controle externo
+            if (externalControl)
+            {
+                yield return null;
+                continue;
+            }
+
             if (TryGetRandomPointOnNavmesh(transform.position, radius, out var dest, agent.areaMask, sampleMax))
                 agent.SetDestination(dest);
 
-            // Janela de movimento
             float travelWindow = Random.Range(roamRange.x, roamRange.y);
             float endTime = Time.time + travelWindow;
             while (Time.time < endTime)
             {
+                if (externalControl) break;
                 yield return null;
                 if (!agent.pathPending && agent.remainingDistance <= agent.stoppingDistance + 0.1f) break;
             }
 
-            // Pausa curta
+            if (externalControl) continue;
+
             yield return new WaitForSeconds(Random.Range(idleRange.x, idleRange.y));
         }
     }
