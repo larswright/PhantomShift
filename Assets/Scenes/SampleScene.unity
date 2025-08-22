@@ -695,6 +695,7 @@ GameObject:
   - component: {fileID: 1583606926}
   - component: {fileID: 1583606925}
   - component: {fileID: 1583606924}
+  - component: {fileID: 1583606932}
   m_Layer: 8
   m_Name: Sphere
   m_TagString: Untagged
@@ -889,6 +890,28 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1583606932
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1583606923}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c137ab3dcdf24a75bc937da08a16ea56, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GhostVacuum
+  syncDirection: 0
+  syncMode: 0
+  syncInterval: 0
+  secondsToCapture: 0
+  minigameCount: -1
+  minigameHandleSpeed: 0
+  minigameHitWindow: 0
+  onProgress:
+    m_PersistentCalls:
+      m_Calls: []
 --- !u!1 &1827899223
 GameObject:
   m_ObjectHideFlags: 0

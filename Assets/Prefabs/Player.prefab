@@ -282,6 +282,7 @@ GameObject:
   - component: {fileID: 6199238017552779366}
   - component: {fileID: 6796669336672680264}
   - component: {fileID: 2797746799800993469}
+  - component: {fileID: 7559695260437069160}
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
@@ -432,6 +433,30 @@ MonoBehaviour:
   ignoreLayers:
     serializedVersion: 2
     m_Bits: 64
+--- !u!114 &7559695260437069160
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3806144520915820610}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2d0fb42b70644f1491209759fef5a311, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerVacuum
+  syncDirection: 0
+  syncMode: 0
+  syncInterval: 0
+  vacuumRayOrigin: {fileID: 9162515036749652180}
+  vacuumRayDistance: 10
+  vacuumRayRadius: 0.5
+  vacuumLayerMask:
+    serializedVersion: 2
+    m_Bits: 256
+  reportInterval: 0.1
+  holdVacuumAction: {fileID: 1120369429361536294, guid: 052faaac586de48259a63d0c4782560b, type: 3}
+  interactAction: {fileID: 1781555164194001046, guid: 052faaac586de48259a63d0c4782560b, type: 3}
 --- !u!1 &4356651487698054798
 GameObject:
   m_ObjectHideFlags: 0
