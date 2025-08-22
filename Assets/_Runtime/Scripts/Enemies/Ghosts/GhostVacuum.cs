@@ -26,6 +26,7 @@ public class GhostVacuum : NetworkBehaviour
     [SyncVar(hook = nameof(OnProgressChanged))]  private float progress01; // 0..1
     [SyncVar] private int awaitingStage; // 0=nenhum; 1..3 = aguardando minigame
     [SyncVar] private uint capturingPlayerNetId;
+    [SyncVar] private int nextStageToTrigger = 1; // próximo estágio ainda não cumprido
 
     // ---- refs
     private GhostCaptureable cap;
@@ -115,8 +116,9 @@ public class GhostVacuum : NetworkBehaviour
             return;
         }
 
-        // Sucesso: limpa o "await" e segue sugando
+        // Sucesso: marca estágio como concluído e libera avanço
         awaitingStage = 0;
+        nextStageToTrigger = Mathf.Min(nextStageToTrigger + 1, minigameCount + 1);
     }
 
     // ============== Internals ==============
@@ -126,6 +128,7 @@ public class GhostVacuum : NetworkBehaviour
     {
         capturing = true;
         capturingPlayerNetId = playerNetId;
+        nextStageToTrigger = 1; // garante início limpo
 
         // congela movimento e zera velocidade instantaneamente
         ghost.ServerSetExternalControl(true);
@@ -137,18 +140,14 @@ public class GhostVacuum : NetworkBehaviour
     void TriggerMinigamesIfNeeded()
     {
         if (minigameCount <= 0) return;
+        if (awaitingStage != 0) return;
+        if (nextStageToTrigger < 1 || nextStageToTrigger > minigameCount) return;
 
-        // Checa thresholds na ordem; dispara o próximo ainda não cumprido
-        for (int i = 1; i <= minigameCount; i++)
+        float thr = stageThresholds[nextStageToTrigger - 1];
+        if (progress01 >= thr)
         {
-            if (awaitingStage != 0) break; // já aguardando
-            float thr = stageThresholds[i - 1];
-            // Dispara quando cruzar o threshold (>=), sem repetir
-            if (progress01 >= thr)
-            {
-                awaitingStage = i;
-                BeginMinigame(i);
-            }
+            awaitingStage = nextStageToTrigger;
+            BeginMinigame(awaitingStage);
         }
     }
 
@@ -183,6 +182,7 @@ public class GhostVacuum : NetworkBehaviour
     {
         capturing = false;
         awaitingStage = 0;
+        nextStageToTrigger = 1;
 
         // Aqui você pode tocar VFX/SFX, soltar loot etc.
         NetworkServer.Destroy(gameObject); // remove o fantasma capturado
@@ -195,6 +195,7 @@ public class GhostVacuum : NetworkBehaviour
         awaitingStage = 0;
         progress01 = 0f;
         capturingPlayerNetId = 0;
+        nextStageToTrigger = 1;
 
         // Libera controle para IA voltar a andar
         ghost.ServerSetExternalControl(false);

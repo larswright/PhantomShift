@@ -65,7 +65,12 @@ public class GhostCaptureable : NetworkBehaviour
     void ApplyMotionStats(GhostArchetype.MotionStats stats, bool flee)
     {
         if (!agent) return;
-        agent.speed = stats.moveSpeed;
+        // Base
+        float speed = stats.moveSpeed;
+        // Se em fuga, aplica multiplicador agressivo do archetype (se existir)
+        if (flee && archetype)
+            speed *= Mathf.Max(1f, archetype.capture_fleeSpeedMultiplier);
+        agent.speed = speed;
         agent.acceleration = stats.acceleration;
         agent.angularSpeed = stats.angularSpeed;
         agent.stoppingDistance = stats.stoppingDistance;
@@ -135,6 +140,15 @@ public class GhostCaptureable : NetworkBehaviour
     {
         while (fleeing && !stunned)
         {
+            // Modula velocidade pela intensidade de exposição (0..1)
+            if (archetype && agent)
+            {
+                float baseFlee = archetype.fleeStats.moveSpeed;
+                float multMax  = Mathf.Max(1f, archetype.capture_fleeSpeedMultiplier);
+                // Resposta progressiva: com pouca exposição ~base, com muita exposição ~base*multMax
+                agent.speed = Mathf.Max(0.1f, Mathf.Lerp(baseFlee, baseFlee * multMax, escapeIntensity));
+            }
+
             // Se não recebeu direção ainda, usa forward só para evitar zero.
             Vector3 d = lastRayDir.sqrMagnitude > 0.0001f ? lastRayDir : transform.forward;
 
@@ -162,6 +176,7 @@ public class GhostCaptureable : NetworkBehaviour
             // Intensidade linear 0..1 pela fração de exposição
             escapeIntensity = Mathf.Clamp01(exposureTimer / Mathf.Max(0.01f, uvSecondsToStun));
 
+            // Mantém a cadência de decisão existente
             yield return new WaitForSeconds(fleeDecisionInterval);
         }
     }
@@ -173,6 +188,12 @@ public class GhostCaptureable : NetworkBehaviour
         stunned = true;
         fleeing = false;
         ghost.ServerSetExternalControl(true);
+        // Congela imediatamente o movimento para evitar "deslize"
+        if (agent)
+        {
+            agent.ResetPath();
+            agent.velocity = Vector3.zero;
+        }
         if (fleeCo != null) StopCoroutine(fleeCo);
         fleeCo = null;
         if (archetype) ApplyMotionStats(archetype.defaultStats, false);
