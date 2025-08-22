@@ -20,10 +20,10 @@ MonoBehaviour:
     angularSpeed: 900
     stoppingDistance: 0.2
   fleeStats:
-    moveSpeed: 7.5
-    acceleration: 50
-    angularSpeed: 1000
-    stoppingDistance: 0.1
+    moveSpeed: 10
+    acceleration: 200
+    angularSpeed: 5000
+    stoppingDistance: 0.05
   wanderRadius: 12
   pathRecalcDistance: 0.6
   idlePauseRange: {x: 0.5, y: 1.5}
@@ -39,7 +39,7 @@ MonoBehaviour:
   burstDurationRange: {x: 0.25, y: 0.6}
   areaMask: -1
   sampleMaxDistance: 2
-  capture_uvSecondsToStun: 2
+  capture_uvSecondsToStun: 4
   capture_stunSeconds: 3
   capture_exposureGraceWindow: 0.6
   capture_fleeDecisionInterval: 0.25
