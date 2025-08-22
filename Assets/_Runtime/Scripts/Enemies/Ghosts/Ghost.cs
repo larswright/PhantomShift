@@ -5,7 +5,6 @@ using System.Collections;
 
 [RequireComponent(typeof(NetworkIdentity))]
 [RequireComponent(typeof(NavMeshAgent))]
-[RequireComponent(typeof(NetworkTransform))]
 public class Ghost : NetworkBehaviour
 {
     [SerializeField] private GhostArchetype archetype;

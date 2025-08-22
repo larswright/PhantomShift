@@ -149,13 +149,14 @@ public class PlayerFlashlight : NetworkBehaviour
     [Command]
     void CmdUVHit(uint netId, Vector3 origin, float dt)
     {
-        if (NetworkIdentity.spawned.TryGetValue(netId, out var id))
+        if (NetworkServer.spawned.TryGetValue(netId, out var identity))
         {
-            var cap = id.GetComponent<GhostCaptureable>();
+            var cap = identity.GetComponent<GhostCaptureable>();
             if (cap)
                 cap.ServerApplyUVHit(origin, dt);
         }
     }
+
 
     void Update()
     {
