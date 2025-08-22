@@ -44,4 +44,10 @@ public partial class GhostArchetype : ScriptableObject
     public float capture_fleeRadius = 10f;
     public AnimationCurve capture_escapeCurve = AnimationCurve.EaseInOut(0,0,1,1);
     public AnimationCurve capture_stunCurve   = AnimationCurve.EaseInOut(0,1,1,0);
+
+    [Header("Capture – Aggressive Flee")]
+    public float capture_fleeSpeedMultiplier = 2.2f;
+    public Vector2 capture_fleeSegmentDuration = new Vector2(0.8f, 1.4f); // “corrida” contínua
+    [Range(0,1)] public float capture_hardTurnChance = 0.40f;
+    public Vector2 capture_hardTurnDegrees = new Vector2(60f, 140f); // viradas secas aleatórias
 }

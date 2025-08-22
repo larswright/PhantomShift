@@ -41,6 +41,7 @@ public class GhostCaptureable : NetworkBehaviour
     private float exposureTimer;
     private float lastUVTime;
     private Vector3 lastOrigin;
+    private float baseSpeed, baseAngular, baseAccel;
 
     public override void OnStartServer()
     {
@@ -49,6 +50,9 @@ public class GhostCaptureable : NetworkBehaviour
         if (!ghost) Debug.LogWarning("[GhostCaptureable] Ghost component missing", this);
         if (!agent) Debug.LogWarning("[GhostCaptureable] NavMeshAgent missing", this);
         ApplyConfig();
+        baseSpeed = agent.speed;
+        baseAngular = agent.angularSpeed;
+        baseAccel = agent.acceleration;
     }
 
     void ApplyConfig()
@@ -62,6 +66,29 @@ public class GhostCaptureable : NetworkBehaviour
         fleeRadius = archetype.capture_fleeRadius;
         escapeCurve = archetype.capture_escapeCurve;
         stunCurve = archetype.capture_stunCurve;
+    }
+
+    void SetFleeBoost(bool on)
+    {
+        if (!agent) return;
+        if (on)
+        {
+            // velocidade e resposta agressivas
+            agent.speed = baseSpeed * (archetype ? Mathf.Max(1f, archetype.capture_fleeSpeedMultiplier) : 2.2f);
+            agent.angularSpeed = Mathf.Max(baseAngular, 900f);
+            agent.acceleration = Mathf.Max(baseAccel, 40f);
+            agent.autoBraking = false;
+            agent.obstacleAvoidanceType = ObstacleAvoidanceType.GoodQualityObstacleAvoidance; // menos suavização que High
+        }
+        else
+        {
+            agent.speed = baseSpeed;
+            agent.angularSpeed = baseAngular;
+            agent.acceleration = baseAccel;
+            agent.autoBraking = true;
+            // restaura o padrão do Ghost.ApplyConfig()
+            agent.obstacleAvoidanceType = ObstacleAvoidanceType.HighQualityObstacleAvoidance;
+        }
     }
 
     [Server]
@@ -108,6 +135,7 @@ public class GhostCaptureable : NetworkBehaviour
         fleeing = true;
         Debug.Log($"[GhostCaptureable] {name} fugindo da UV");
         ghost.ServerSetExternalControl(true);
+        SetFleeBoost(true);
         fleeCo = StartCoroutine(FleeLoop());
     }
 
@@ -117,6 +145,7 @@ public class GhostCaptureable : NetworkBehaviour
         if (!fleeing) return;
         fleeing = false;
         ghost.ServerSetExternalControl(false);
+        SetFleeBoost(false);
         if (fleeCo != null) StopCoroutine(fleeCo);
         fleeCo = null;
     }
@@ -124,18 +153,41 @@ public class GhostCaptureable : NetworkBehaviour
     [Server]
     IEnumerator FleeLoop()
     {
+        float segMin = archetype ? archetype.capture_fleeSegmentDuration.x : 0.8f;
+        float segMax = archetype ? archetype.capture_fleeSegmentDuration.y : 1.4f;
+        float turnChance = archetype ? archetype.capture_hardTurnChance : 0.40f;
+        Vector2 turnDeg = archetype ? archetype.capture_hardTurnDegrees : new Vector2(60f, 140f);
+
         while (fleeing && !stunned)
         {
-            Vector3 away = (transform.position - lastOrigin).normalized;
-            Vector3 random = Random.insideUnitSphere; random.y = 0f;
-            float step = Random.Range(fleeStepRange.x, fleeStepRange.y);
-            Vector3 target = transform.position + (away + random).normalized * step;
-            if (Ghost.TryGetRandomPointOnNavmesh(target, fleeRadius, out var dest, agent.areaMask, 2f))
-                agent.SetDestination(dest);
+            // direção base: afastar do UV
+            Vector3 dir = (transform.position - lastOrigin).normalized;
 
-            float exposure01 = Mathf.Clamp01(exposureTimer / Mathf.Max(0.01f, uvSecondsToStun));
-            escapeIntensity = escapeCurve.Evaluate(exposure01);
-            yield return new WaitForSeconds(fleeDecisionInterval);
+            // vira seco aleatório para quebrar previsibilidade
+            if (Random.value < turnChance)
+            {
+                float deg = Random.Range(turnDeg.x, turnDeg.y) * (Random.value < 0.5f ? -1f : 1f);
+                dir = Quaternion.Euler(0f, deg, 0f) * dir;
+            }
+
+            // passo longo + ruído leve (evita “tremido”)
+            Vector3 random = Random.insideUnitSphere * 0.35f; random.y = 0f;
+            float step = Random.Range(fleeStepRange.x, fleeStepRange.y);  // do Archetype
+            Vector3 target = transform.position + (dir + random).normalized * step;
+
+            if (Ghost.TryGetRandomPointOnNavmesh(target, fleeRadius, out var dest, agent.areaMask, 2f))
+                agent.SetDestination(dest);  // define e mantém
+
+            // mantém o destino por toda a duração do segmento (sem retarget)
+            float end = Time.time + Random.Range(segMin, segMax);
+            while (Time.time < end && fleeing && !stunned)
+            {
+                float exposure01 = Mathf.Clamp01(exposureTimer / Mathf.Max(0.01f, uvSecondsToStun));
+                escapeIntensity = escapeCurve.Evaluate(exposure01);
+                // sai cedo se já chegou
+                if (!agent.pathPending && agent.remainingDistance <= agent.stoppingDistance + 0.1f) break;
+                yield return null;
+            }
         }
     }
 
@@ -147,6 +199,7 @@ public class GhostCaptureable : NetworkBehaviour
         Debug.Log($"[GhostCaptureable] {name} foi atordoado pela UV");
         fleeing = false;
         ghost.ServerSetExternalControl(true);
+        SetFleeBoost(false);
         if (fleeCo != null) StopCoroutine(fleeCo);
         fleeCo = null;
         stunCo = StartCoroutine(StunLoop());
