@@ -61,12 +61,12 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 829374544656403776}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -0.008, y: 2.677, z: 0.586}
-  m_LocalScale: {x: 0.1, y: 0.1, z: 0.1}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: -0.0079996325, y: 0.07700002, z: 0.58600014}
+  m_LocalScale: {x: 0.099999994, y: 0.1, z: 0.099999994}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 9030041988045222608}
+  m_Father: {fileID: 4676840610027812371}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!33 &6989688114279270435
 MeshFilter:
@@ -282,7 +282,6 @@ GameObject:
   - component: {fileID: 6199238017552779366}
   - component: {fileID: 6796669336672680264}
   - component: {fileID: 2797746799800993469}
-  - component: {fileID: 4065653128202712775}
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
@@ -305,7 +304,6 @@ Transform:
   m_Children:
   - {fileID: 7985521736785314142}
   - {fileID: 5611595459388793733}
-  - {fileID: 9162515036749652180}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 93.99, z: 0}
 --- !u!143 &7573329489567321306
@@ -434,32 +432,6 @@ MonoBehaviour:
   ignoreLayers:
     serializedVersion: 2
     m_Bits: 64
---- !u!114 &4065653128202712775
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3806144520915820610}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 77eb0a0173a1a9f498d4f71eb4674862, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::PlayerFlashlight
-  syncDirection: 0
-  syncMode: 0
-  syncInterval: 0
-  normalLightGO: {fileID: 6018033631994441031}
-  uvLightGO: {fileID: 568335818797992693}
-  maxCharges: 3
-  secondsPerCharge: 12
-  uvRayOrigin: {fileID: 9162515036749652180}
-  uvRayDistance: 10
-  uvRayRadius: 0.5
-  uvReportInterval: 0.1
-  uvLayerMask:
-    serializedVersion: 2
-    m_Bits: 256
 --- !u!1 &4356651487698054798
 GameObject:
   m_ObjectHideFlags: 0
@@ -472,6 +444,7 @@ GameObject:
   - component: {fileID: 7802847976589841661}
   - component: {fileID: 4778630835067406746}
   - component: {fileID: 4198388991063794562}
+  - component: {fileID: 317973656497356239}
   m_Layer: 0
   m_Name: Cam
   m_TagString: Untagged
@@ -491,7 +464,8 @@ Transform:
   m_LocalPosition: {x: 0, y: 1, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
-  m_Children: []
+  m_Children:
+  - {fileID: 9162515036749652180}
   m_Father: {fileID: 5611595459388793733}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!20 &7802847976589841661
@@ -597,6 +571,32 @@ MonoBehaviour:
     m_VarianceClampScale: 0.9
     m_ContrastAdaptiveSharpening: 0
   m_Version: 2
+--- !u!114 &317973656497356239
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4356651487698054798}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 77eb0a0173a1a9f498d4f71eb4674862, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerFlashlight
+  syncDirection: 0
+  syncMode: 0
+  syncInterval: 0
+  normalLightGO: {fileID: 6018033631994441031}
+  uvLightGO: {fileID: 568335818797992693}
+  maxCharges: 3
+  secondsPerCharge: 12
+  uvRayOrigin: {fileID: 9162515036749652180}
+  uvRayDistance: 10
+  uvRayRadius: 0.5
+  uvReportInterval: 0.1
+  uvLayerMask:
+    serializedVersion: 2
+    m_Bits: 256
 --- !u!1 &5341637204439006468
 GameObject:
   m_ObjectHideFlags: 0
