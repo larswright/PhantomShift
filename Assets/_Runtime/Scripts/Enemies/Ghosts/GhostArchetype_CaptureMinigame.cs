@@ -10,7 +10,5 @@ public partial class GhostArchetype
     public float[] mg_windowWidth = new float[] { 0.22f, 0.18f, 0.14f };
     [Tooltip("Quantas tentativas dentro do mesmo round (ex.: 1,1,2).")]
     public int[] mg_attempts = new int[] { 1, 1, 1 };
-    [Tooltip("Penalidade ao falhar (fração do progresso 0..1 removida).")]
-    [Range(0f, 0.5f)] public float mg_failPenalty = 0.12f;
 }
 
