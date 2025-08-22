@@ -1,5 +1,6 @@
 using Mirror;
 using UnityEngine;
+using UnityEngine.InputSystem; // Novo Input System
 
 [RequireComponent(typeof(CharacterController))]
 public class PlayerFPS : NetworkBehaviour
@@ -24,10 +25,22 @@ public class PlayerFPS : NetworkBehaviour
     public float maxPitch = 80f;
     public bool lockCursor = true;
 
+    // ---- Novo Input System ----
+    InputSystem_Actions actions;
+    InputAction moveAction;
+    InputAction lookAction;
+    InputAction sprintAction;
+    InputAction jumpAction;
+
     // estado interno
     float pitch;       // rotação X da câmera
     float yaw;         // rotação Y do corpo
     float yVelocity;   // velocidade vertical (gravidade/pulo)
+
+    Vector2 moveInput; // W/A/S/D ou stick
+    Vector2 lookInput; // delta do mouse ou stick direito
+    bool sprintHeld;   // LeftShift ou equivalente
+    bool jumpQueued;   // sobe 1 frame quando botão dispara
 
     void Reset()
     {
@@ -39,6 +52,29 @@ public class PlayerFPS : NetworkBehaviour
             if (camT != null) cam = camT.GetComponent<Camera>();
             if (camT != null) audioListener = camT.GetComponent<AudioListener>();
         }
+    }
+
+    void Awake()
+    {
+        // Instancia e referencia as actions do mapa Player
+        actions = new InputSystem_Actions(); // wrapper gerado
+        moveAction = actions.Player.Move;
+        lookAction = actions.Player.Look;
+        sprintAction = actions.Player.Sprint;
+        jumpAction = actions.Player.Jump;
+
+        // Callbacks (eventos). Evita polling manual e dá suporte a teclado/gamepad/mouse.
+        moveAction.performed += ctx => moveInput = ctx.ReadValue<Vector2>();
+        moveAction.canceled += ctx => moveInput = Vector2.zero;
+
+        lookAction.performed += ctx => lookInput = ctx.ReadValue<Vector2>();
+        lookAction.canceled += ctx => lookInput = Vector2.zero;
+
+        sprintAction.performed += ctx => sprintHeld = ctx.ReadValueAsButton();
+        sprintAction.canceled += ctx => sprintHeld = false;
+
+        // Jump: fila um pulo no momento do "performed" (borda de subida)
+        jumpAction.performed += ctx => jumpQueued = true;
     }
 
     public override void OnStartLocalPlayer()
@@ -56,20 +92,38 @@ public class PlayerFPS : NetworkBehaviour
 
         // inicia yaw a partir da rotação atual
         yaw = transform.eulerAngles.y;
+
+        // Habilita ações somente no local player
+        actions.Player.Enable();
+    }
+
+    void OnEnable()
+    {
+        if (isLocalPlayer)
+            actions?.Player.Enable();
     }
 
     void OnDisable()
     {
-        if (isLocalPlayer && lockCursor)
+        if (isLocalPlayer)
         {
-            Cursor.lockState = CursorLockMode.None;
-            Cursor.visible = true;
+            actions?.Player.Disable();
+
+            if (lockCursor)
+            {
+                Cursor.lockState = CursorLockMode.None;
+                Cursor.visible = true;
+            }
         }
+    }
+
+    void OnDestroy()
+    {
+        actions?.Dispose();
     }
 
     void Update()
     {
-        // Apenas o dono processa entrada e move.
         if (!isLocalPlayer) return;
 
         Look();
@@ -78,11 +132,12 @@ public class PlayerFPS : NetworkBehaviour
 
     void Look()
     {
-        // Usando Input Manager antigo (Axes padrão do Unity).
-        float mouseX = Input.GetAxis("Mouse X") * mouseSensitivity * Time.deltaTime;
-        float mouseY = Input.GetAxis("Mouse Y") * mouseSensitivity * Time.deltaTime;
+        // lookInput vem de Pointer.delta / RightStick, etc. (mapa "Look")
+        // Ajuste de sensibilidade; manter * Time.deltaTime para suavizar.
+        float mouseX = lookInput.x * mouseSensitivity * Time.deltaTime;
+        float mouseY = lookInput.y * mouseSensitivity * Time.deltaTime;
 
-        yaw   += mouseX;
+        yaw += mouseX;
         pitch -= mouseY;
         pitch = Mathf.Clamp(pitch, minPitch, maxPitch);
 
@@ -95,21 +150,21 @@ public class PlayerFPS : NetworkBehaviour
 
     void Move()
     {
-        float h = Input.GetAxisRaw("Horizontal"); // A/D
-        float v = Input.GetAxisRaw("Vertical");   // W/S
-        bool isSprinting = Input.GetKey(KeyCode.LeftShift);
-
-        Vector3 inputDir = (transform.right * h + transform.forward * v);
+        // moveInput.x = A/D; moveInput.y = W/S (ou analógico)
+        Vector3 inputDir = transform.right * moveInput.x + transform.forward * moveInput.y;
         if (inputDir.sqrMagnitude > 1f) inputDir.Normalize();
 
-        float speed = isSprinting ? sprintSpeed : walkSpeed;
+        float speed = sprintHeld ? sprintSpeed : walkSpeed;
 
         // Gravidade e pulo
         if (controller.isGrounded && yVelocity < 0f)
             yVelocity = -2f; // "cola" no chão
 
-        if (controller.isGrounded && Input.GetButtonDown("Jump"))
+        if (controller.isGrounded && jumpQueued)
+        {
             yVelocity = Mathf.Sqrt(jumpHeight * -2f * gravity);
+            jumpQueued = false; // consome o evento
+        }
 
         yVelocity += gravity * Time.deltaTime;
 
