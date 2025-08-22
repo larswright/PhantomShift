@@ -22,14 +22,23 @@ MonoBehaviour:
   pathRecalcDistance: 0.6
   idlePauseRange: {x: 0.5, y: 1.5}
   roamIntervalRange: {x: 2, y: 4}
+  erratic: 1
+  zigStep: 7
+  zigAmplitude: 12
+  zigPeriodRange: {x: 0.4, y: 0.8}
+  hardTurnChance: 0.82
+  hardTurnDegrees: 90
+  burstChance: 0.737
+  burstMultiplier: 1
+  burstDurationRange: {x: 0.25, y: 0.6}
   areaMask: -1
   sampleMaxDistance: 2
   capture_uvSecondsToStun: 2
   capture_stunSeconds: 3
   capture_exposureGraceWindow: 0.6
   capture_fleeDecisionInterval: 0.25
-  capture_fleeStepRange: {x: 1, y: 2}
-  capture_fleeRadius: 10
+  capture_fleeStepRange: {x: 8, y: 15}
+  capture_fleeRadius: 15
   capture_escapeCurve:
     serializedVersion: 2
     m_Curve:
@@ -78,3 +87,7 @@ MonoBehaviour:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
+  capture_fleeSpeedMultiplier: 2.2
+  capture_fleeSegmentDuration: {x: 0.8, y: 1.4}
+  capture_hardTurnChance: 0.4
+  capture_hardTurnDegrees: {x: 60, y: 140}
