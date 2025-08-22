@@ -456,7 +456,6 @@ MonoBehaviour:
     m_Bits: 256
   reportInterval: 0.1
   holdVacuumAction: {fileID: 1120369429361536294, guid: 052faaac586de48259a63d0c4782560b, type: 3}
-  interactAction: {fileID: 1781555164194001046, guid: 052faaac586de48259a63d0c4782560b, type: 3}
 --- !u!1 &4356651487698054798
 GameObject:
   m_ObjectHideFlags: 0

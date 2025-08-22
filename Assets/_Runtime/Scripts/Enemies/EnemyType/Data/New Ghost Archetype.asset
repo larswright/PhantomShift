@@ -50,6 +50,3 @@ MonoBehaviour:
   capture_hardTurnChance: 0.4
   capture_hardTurnDegrees: {x: 60, y: 140}
   capture_vacuumSecondsToCapture: 4
-  capture_minigameCount: 1
-  capture_minigameHandleSpeed: 0.3
-  capture_minigameHitWindow: 0.06
