@@ -72,6 +72,7 @@ public class GhostCaptureable : NetworkBehaviour
         lastUVTime = now;
         exposureTimer += dt;
         lastOrigin = origin;
+        Debug.Log($"[GhostCaptureable] {name} recebeu UV: {exposureTimer:F2}/{uvSecondsToStun:F2}s");
 
         if (!stunned)
         {
@@ -101,6 +102,7 @@ public class GhostCaptureable : NetworkBehaviour
     {
         if (fleeing || stunned) return;
         fleeing = true;
+        Debug.Log($"[GhostCaptureable] {name} fugindo da UV");
         ghost.ServerSetExternalControl(true);
         fleeCo = StartCoroutine(FleeLoop());
     }
@@ -138,6 +140,7 @@ public class GhostCaptureable : NetworkBehaviour
     {
         if (stunned) return;
         stunned = true;
+        Debug.Log($"[GhostCaptureable] {name} foi atordoado pela UV");
         fleeing = false;
         ghost.ServerSetExternalControl(true);
         if (fleeCo != null) StopCoroutine(fleeCo);
@@ -159,6 +162,7 @@ public class GhostCaptureable : NetworkBehaviour
         ghost.ServerSetExternalControl(false);
         stunCo = null;
         exposureTimer = 0f;
+        Debug.Log($"[GhostCaptureable] {name} recuperou do stun");
     }
 
     void OnFleeState(bool _, bool newVal)
