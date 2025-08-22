@@ -36,7 +36,6 @@ public class GhostVacuum : NetworkBehaviour
     // ---- Novo: controle de minigame/checkpoints
     private int nextRoundIndex;               // 0..mg_rounds-1
     private float[] checkpoints;              // frações 0..1 (ex.: 0.33, 0.66, 0.99)
-    private float failPenalty01;              // fração a remover em falha
     private float[] roundSpeed;
     private float[] roundWidth;
     private int[]   roundAttempts;
@@ -130,8 +129,6 @@ public class GhostVacuum : NetworkBehaviour
         for (int i = 0; i < rounds; i++)
             checkpoints[i] = (i + 1) / (float)(rounds + 0);
 
-        failPenalty01 = arch ? Mathf.Clamp01(arch.mg_failPenalty) : 0.12f;
-
         // arrays por round (fallback em caso de tamanhos incompatíveis)
         roundSpeed    = BuildRoundArray(arch?.mg_markerSpeed, rounds, 1.6f);
         roundWidth    = BuildRoundArray(arch?.mg_windowWidth, rounds, 0.18f);
@@ -202,14 +199,17 @@ public class GhostVacuum : NetworkBehaviour
 
         if (!success)
         {
-            // penaliza e clampa
-            progress01 = Mathf.Max(0f, progress01 - failPenalty01);
+            waitingMinigame = false;
+            capturing = false;
+            capturingPlayerNetId = 0;
+            ghost.ServerSetExternalControl(false);
+            return;
         }
 
         waitingMinigame = false;
         nextRoundIndex = Mathf.Min(nextRoundIndex + 1, (checkpoints?.Length ?? 0));
 
-        // libera movimento "travado" sob nosso controle (continua travado enquanto capturando)
+        // mantém o fantasma travado enquanto a captura continua
         ghost.ServerSetExternalControl(true);
 
         // Se já tinha atingido 100%, finalize agora
