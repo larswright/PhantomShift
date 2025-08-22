@@ -61,7 +61,7 @@ public class PlayerFlashlight : NetworkBehaviour
     public override void OnStartServer()
     {
         // Estado inicial
-        uvSecondsRemaining = Mathf.Clamp(uvSecondsRemaining, 0f, MaxUVSeconds);
+        uvSecondsRemaining = MaxUVSeconds;
         normalOn = false;
         uvOn = false;
     }
@@ -105,12 +105,14 @@ public class PlayerFlashlight : NetworkBehaviour
     void OnHoldUVPressed(InputAction.CallbackContext _)
     {
         if (!isLocalPlayer) return;
+        Debug.Log("[PF] HoldUV pressed (cliente)");
         CmdRequestUV(true);
     }
 
     void OnHoldUVReleased(InputAction.CallbackContext _)
     {
         if (!isLocalPlayer) return;
+        Debug.Log("[PF] HoldUV released (cliente)");
         CmdRequestUV(false);
     }
 
@@ -126,6 +128,7 @@ public class PlayerFlashlight : NetworkBehaviour
     [Command]
     void CmdRequestUV(bool wantOn)
     {
+        Debug.Log($"[PF][SV] CmdRequestUV({wantOn}) uvOn={uvOn} uvSeconds={uvSecondsRemaining:F2}");
         if (wantOn)
         {
             // Liga se houver recurso
@@ -149,7 +152,7 @@ public class PlayerFlashlight : NetworkBehaviour
     [Command]
     void CmdUVHit(uint netId, Vector3 origin, float dt)
     {
-        Debug.Log($"[PlayerFlashlight] Reportando UV no netId {netId}");
+        Debug.Log($"[PF][SV] Reportando UV no netId {netId} dt={dt:F2}");
         if (NetworkServer.spawned.TryGetValue(netId, out var identity))
         {
             var cap = identity.GetComponent<GhostCaptureable>();
@@ -161,24 +164,30 @@ public class PlayerFlashlight : NetworkBehaviour
 
     void Update()
     {
-        if (!isLocalPlayer) return;
-        if (!uvOn) return;
-        if (!uvRayOrigin) return;
+        if (!isLocalPlayer) { Debug.Log("[PF] !isLocalPlayer"); return; }
+        if (!uvOn)          { Debug.Log("[PF] UV OFF no cliente"); return; }
+        if (!uvRayOrigin)   { Debug.Log("[PF] uvRayOrigin nulo"); return; }
         if (Time.time < nextUVReportTime) return;
         nextUVReportTime = Time.time + uvReportInterval;
 
         var ray = new Ray(uvRayOrigin.position, uvRayOrigin.forward);
-        if (Physics.SphereCast(ray, uvRayRadius, out var hit, uvRayDistance, uvLayerMask, QueryTriggerInteraction.Ignore))
+        Debug.DrawRay(ray.origin, ray.direction * uvRayDistance, Color.magenta, 0.1f);
+        if (Physics.SphereCast(ray, uvRayRadius, out var hit, uvRayDistance, uvLayerMask, QueryTriggerInteraction.Collide))
         {
-            Debug.Log($"[PlayerFlashlight] UV apontando para {hit.collider.name}");
+            Debug.Log($"[PF] UV apontando para {hit.collider.name}");
             var cap = hit.collider.GetComponentInParent<GhostCaptureable>();
             if (cap)
             {
-                Debug.Log($"[PlayerFlashlight] UV atingiu fantasma {cap.name}");
+                Debug.Log($"[PF] UV atingiu fantasma {cap.name}");
                 var id = cap.netIdentity;
-                if (id)
-                    CmdUVHit(id.netId, uvRayOrigin.position, uvReportInterval);
+                if (id) CmdUVHit(id.netId, uvRayOrigin.position, uvReportInterval);
+                else     Debug.LogWarning("[PF] Ghost sem NetworkIdentity");
             }
+            else Debug.LogWarning("[PF] Collider sem GhostCaptureable no parent");
+        }
+        else
+        {
+            Debug.Log("[PF] SphereCast não encontrou nada");
         }
     }
 
@@ -233,10 +242,19 @@ public class PlayerFlashlight : NetworkBehaviour
 
     // ===== Hooks de SyncVar =====
 
-    void OnNormalChanged(bool _, bool newVal) => ApplyNormalVisual(newVal);
-    void OnUVChanged(bool _, bool newVal) => ApplyUVVisual(newVal);
+    void OnNormalChanged(bool _, bool newVal)
+    {
+        Debug.Log($"[PF] Normal {(newVal ? "ON" : "OFF")}");
+        ApplyNormalVisual(newVal);
+    }
+    void OnUVChanged(bool _, bool newVal)
+    {
+        Debug.Log($"[PF] UV {(newVal ? "ON" : "OFF")}");
+        ApplyUVVisual(newVal);
+    }
     void OnUVSecondsChanged(float _, float __)
     {
+        Debug.Log($"[PF] uvSecondsRemaining={uvSecondsRemaining:F2}");
         // Ponto para UI/HUD: atualizar barra/ícone se desejar.
         // Ex.: dispatch de evento, UnityEvent, etc.
     }
