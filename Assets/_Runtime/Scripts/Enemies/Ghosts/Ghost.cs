@@ -121,7 +121,8 @@ public class Ghost : NetworkBehaviour
                     if (externalControl) break;
                     yield return null;
                 }
-                agent.speed = prev;
+                if (!externalControl)
+                    agent.speed = prev;
             }
 
             // Janela curta entre decisões (mais “nervoso”)
