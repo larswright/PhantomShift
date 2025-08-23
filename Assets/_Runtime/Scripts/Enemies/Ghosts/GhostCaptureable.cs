@@ -73,6 +73,8 @@ public class GhostCaptureable : NetworkBehaviour
         agent.obstacleAvoidanceType = flee
             ? ObstacleAvoidanceType.GoodQualityObstacleAvoidance
             : ObstacleAvoidanceType.HighQualityObstacleAvoidance;
+        if (flee && archetype)
+            agent.speed *= archetype.capture_fleeSpeedMultiplier;
     }
 
     [Server]
@@ -114,6 +116,7 @@ public class GhostCaptureable : NetworkBehaviour
         fleeing = true;
         ghost.ServerSetExternalControl(true);
         if (archetype) ApplyMotionStats(archetype.fleeStats, true);
+        Debug.Log($"[GhostCaptureable] {name} entrou em Flee com velocidade {agent.speed:F2}");
         fleeCo = StartCoroutine(FleeLoop());
     }
 
