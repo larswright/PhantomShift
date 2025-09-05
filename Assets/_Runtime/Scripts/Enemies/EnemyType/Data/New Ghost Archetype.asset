@@ -20,9 +20,9 @@ MonoBehaviour:
     angularSpeed: 900
     stoppingDistance: 0.2
   fleeStats:
-    moveSpeed: 6
-    acceleration: 200
-    angularSpeed: 5000
+    moveSpeed: 10
+    acceleration: 80
+    angularSpeed: 2000
     stoppingDistance: 0.05
   wanderRadius: 12
   pathRecalcDistance: 0.6
@@ -52,8 +52,7 @@ MonoBehaviour:
   capture_vacuumSecondsToCapture: 4
   mg_rounds: 1
   mg_markerSpeed:
-  - 1.2
+  - 2
   mg_windowWidth:
   - 0.13
   mg_attempts: 01000000
-  mg_failPenalty: 0.5
