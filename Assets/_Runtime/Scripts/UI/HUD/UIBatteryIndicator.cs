@@ -23,8 +23,8 @@ public class UIBatteryIndicator : MonoBehaviour
     [Header("Binding")]
     [Tooltip("Vincular automaticamente ao PlayerFlashlight local (Mirror).")]
     public bool autoBindLocalFlashlight = true;
+    public PlayerFlashlight pf;        // alvo local
 
-    private PlayerFlashlight pf;        // alvo local
     private int lastCharges = -1;       // cache p/ evitar trabalho redundante
     private readonly WaitForSecondsRealtime pollShort = new WaitForSecondsRealtime(0.25f);
     private readonly WaitForSecondsRealtime pollLong  = new WaitForSecondsRealtime(1.00f);
@@ -52,7 +52,6 @@ public class UIBatteryIndicator : MonoBehaviour
 
     void TryAttach()
     {
-        if (pf && pf.isLocalPlayer) return;
         if (!autoBindLocalFlashlight) return;
 
         // Mirror: pega o jogador local de forma segura
