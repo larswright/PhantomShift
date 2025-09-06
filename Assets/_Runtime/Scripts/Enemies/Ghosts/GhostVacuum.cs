@@ -30,6 +30,7 @@ public class GhostVacuum : NetworkBehaviour
     private Ghost ghost;
     private NavMeshAgent agent;
     private GhostArchetype arch;
+    private float nextCaptureAllowedTime; // backoff entre tentativas de minigame falhas
 
     // ---- auxiliares servidor
 
@@ -46,7 +47,7 @@ public class GhostVacuum : NetworkBehaviour
         ghost = GetComponent<Ghost>();
         agent = GetComponent<NavMeshAgent>();
 
-        arch = GetArchetypeSafely();
+        arch = cap ? cap.GetArchetype() : null;
         if (arch)
         {
             if (secondsToCapture <= 0f) secondsToCapture = Mathf.Max(0.1f, arch.capture_vacuumSecondsToCapture);
@@ -59,13 +60,7 @@ public class GhostVacuum : NetworkBehaviour
         SetupMinigameFromArchetype();
     }
 
-    GhostArchetype GetArchetypeSafely()
-    {
-        // GhostCaptureable e Ghost possuem referência de archetype no seu serialized
-        // Aqui opto por acessar via campo privado por SerializeField; se não existir, retorna null.
-        var f = typeof(GhostCaptureable).GetField("archetype", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-        return f != null ? (GhostArchetype)f.GetValue(cap) : null;
-    }
+    // Reflection removida: usamos referência direta do GhostCaptureable.GetArchetype()
 
     // ============== API (servidor) chamada pelo PlayerVacuum ==============
 
@@ -73,6 +68,9 @@ public class GhostVacuum : NetworkBehaviour
     public void ServerApplyVacuumHit(uint playerNetId, Vector3 origin, Vector3 dir, float dt)
     {
         if (!cap || !ghost) return;
+
+        // backoff entre tentativas falhas para evitar thrashing
+        if (Time.time < nextCaptureAllowedTime) return;
 
         // precisa estar em modo de captura (já previsto no código original):
         if (!capturing)
@@ -205,6 +203,8 @@ public class GhostVacuum : NetworkBehaviour
             capturing = false;
             capturingPlayerNetId = 0;
             ghost.ServerSetExternalControl(false);
+            // impõe um pequeno cooldown antes de permitir nova tentativa
+            nextCaptureAllowedTime = Time.time + 0.75f;
             return;
         }
 
