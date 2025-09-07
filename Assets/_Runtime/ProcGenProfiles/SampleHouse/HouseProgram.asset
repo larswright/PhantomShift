@@ -19,7 +19,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 16f7ee3bc402c9b40a03ccda85c9aaa7, type: 2}
   CorridorAreaShare: 0.2
   MaxLoops: 1
-  TargetRooms: 32
-  CellSizeMeters: {x: 0.5, y: 0.5}
+  TargetRooms: 10
+  CellSizeMeters: {x: 23, y: 3}
   MinSpawnDistanceFromVan: 25
   MaxSpawnDistanceClamp: 60

@@ -45,7 +45,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DoorSocket
   Profile: {fileID: 11400000, guid: 0015047b70fc3a542b9cf7b44d8565ce, type: 2}
-  NormalLocal: {x: -1, y: 0, z: 0}
+  NormalLocal: {x: 0, y: 0, z: 1}
   GridAnchor: {x: 0, y: 0, z: 0}
 --- !u!1 &5366637161277483741
 GameObject:
@@ -92,7 +92,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DoorSocket
   Profile: {fileID: 11400000, guid: 0015047b70fc3a542b9cf7b44d8565ce, type: 2}
-  NormalLocal: {x: -1, y: 0, z: 0}
+  NormalLocal: {x: -1, y: 0, z: -1}
   GridAnchor: {x: 0, y: 0, z: 0}
 --- !u!1 &6606156856449321265
 GameObject:
@@ -139,7 +139,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DoorSocket
   Profile: {fileID: 11400000, guid: 0015047b70fc3a542b9cf7b44d8565ce, type: 2}
-  NormalLocal: {x: -1, y: 0, z: 0}
+  NormalLocal: {x: 1, y: 0, z: 0}
   GridAnchor: {x: 0, y: 0, z: 0}
 --- !u!1 &7389063566262043437
 GameObject:
