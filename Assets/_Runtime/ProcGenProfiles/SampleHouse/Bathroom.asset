@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b3207152253e9c945baa629e599970f3, type: 3}
+  m_Name: Bathroom
+  m_EditorClassIdentifier: Assembly-CSharp::RoomArchetype
+  Id: Bathroom
+  DisplayName: Bathroom
+  MinCount: 1
+  MaxCount: 3
+  SizeMin: {x: 3, y: 3}
+  SizeMax: {x: 4, y: 4}
+  MustBeAdjacentTo: []
+  PreferAdjacentTo: []
+  Weight: 0.5

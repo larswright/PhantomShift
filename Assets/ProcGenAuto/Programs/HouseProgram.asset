@@ -1,0 +1,25 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 376a80836f258434a84246537ef8c6b6, type: 3}
+  m_Name: HouseProgram
+  m_EditorClassIdentifier: Assembly-CSharp::HouseProgram
+  Archetypes:
+  - {fileID: 11400000, guid: 5c48fc7a4dc19e64694ff48185b60350, type: 2}
+  - {fileID: 11400000, guid: 365e823864ef09a4a804013eba3375ae, type: 2}
+  - {fileID: 11400000, guid: ddeeccba7c37b364aa33dc90f2deea5a, type: 2}
+  - {fileID: 11400000, guid: d27e85706639bf94ca7342e021edf3e1, type: 2}
+  CorridorAreaShare: 0.2
+  MaxLoops: 1
+  TargetRooms: 10
+  CellSizeMeters: {x: 0.5, y: 0.5}
+  MinSpawnDistanceFromVan: 25
+  MaxSpawnDistanceClamp: 60
