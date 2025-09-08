@@ -462,6 +462,60 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 3542647067738213538, guid: 46110b66a8d684949884bea5456f731e, type: 3}
   m_PrefabInstance: {fileID: 938444209}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &1699241529
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1699241531}
+  - component: {fileID: 1699241530}
+  m_Layer: 0
+  m_Name: RoomManager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1699241530
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1699241529}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d19d147ce91424441b19f5e2d37cb4a9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RoomManager
+  seed: 765
+  autoRunOnStart: 1
+  useBFS: 1
+  maxRooms: 12
+  safetyIterations: 10000
+  existingInitialRoom: {fileID: 2041164623}
+  initialRoomPrefab: {fileID: 2041164623}
+  initialAnchor: {fileID: 0}
+  worldParent: {fileID: 0}
+  verboseLog: 0
+--- !u!4 &1699241531
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1699241529}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 3.59291, y: 0, z: -4.17027}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1949453383
 GameObject:
   m_ObjectHideFlags: 0
@@ -599,6 +653,11 @@ MonoBehaviour:
     m_VarianceClampScale: 0.9
     m_ContrastAdaptiveSharpening: 0
   m_Version: 2
+--- !u!1 &2041164623 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 4206874500076000792, guid: 46110b66a8d684949884bea5456f731e, type: 3}
+  m_PrefabInstance: {fileID: 938444209}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
@@ -606,3 +665,4 @@ SceneRoots:
   - {fileID: 1949453386}
   - {fileID: 520702022}
   - {fileID: 938444209}
+  - {fileID: 1699241531}

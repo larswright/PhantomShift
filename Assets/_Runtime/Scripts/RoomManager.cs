@@ -1,241 +1,275 @@
-// RoomManager.cs
+// RoomManager.cs (minimizado para seed + sincronizaÃ§Ã£o)
+using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using Mirror;
 
 /// <summary>
-/// Geração determinística de casa a partir de uma seed.
-/// - Garante um cômodo inicial (existente na cena ou instanciado de um prefab).
-/// - Mantém uma fronteira de sockets livres e decide, por seed, o que instanciar em cada um.
-/// - Ao instanciar, marca o socket fonte e o socket “de retorno” do novo cômodo como ocupados.
+/// Gerencia apenas uma seed compartilhada e a sincroniza para todos os players.
+/// - Se <see cref="randomizeSeed"/> for true, a seed Ã© randomizada no servidor ao iniciar.
+/// - ExpÃµe evento estÃ¡tico quando a seed estiver pronta, para sockets consumirem.
 /// </summary>
 [AddComponentMenu("Level/Room Manager")]
-public class RoomManager : MonoBehaviour
+public class RoomManager : NetworkBehaviour
 {
-    [Header("Seed & Execução")]
-    [Tooltip("Seed para geração determinística.")]
+    public static RoomManager Instance { get; private set; }
+
+    [Header("Seed")] 
+    [Tooltip("Seed global sincronizada entre todos os jogadores (definida pelo servidor).")]
+    [SyncVar(hook = nameof(OnSeedChanged))]
     public int seed = 123456;
-    [Tooltip("Rodar automaticamente no Start().")]
-    public bool autoRunOnStart = true;
-    [Tooltip("Usar BFS (true) ou DFS (false) na fronteira.")]
-    public bool useBFS = true;
 
-    [Header("Limites")]
-    [Tooltip("Número máximo de cômodos, incluindo o inicial.")]
-    public int maxRooms = 12;
-    [Tooltip("Limite de iterações de segurança, evita loops.")]
-    public int safetyIterations = 10000;
+    [Tooltip("Se true, o servidor randomiza a seed ao iniciar a partida.")]
+    public bool randomizeSeed = true;
 
-    [Header("Cena inicial")]
-    [Tooltip("Se definido, este objeto já é o 'hall/entrada' existente na cena.")]
-    public GameObject existingInitialRoom;
-    [Tooltip("Se não houver existingInitialRoom, usa este prefab.")]
-    public GameObject initialRoomPrefab;
-    [Tooltip("Âncora para instanciar o cômodo inicial (apenas quando usado prefab).")]
-    public Transform initialAnchor;
+    // Estado estÃ¡tico para fÃ¡cil consulta pelos sockets
+    public static bool HasSeed => _hasSeed;
+    public static int CurrentSeed => _currentSeed;
 
-    [Header("Parenting")]
-    [Tooltip("Pai global para os cômodos instanciados (opcional).")]
-    public Transform worldParent;
+    public static event Action<int> SeedReady;
 
-    [Header("Log")]
-    public bool verboseLog = false;
+    private static bool _hasSeed;
+    private static int _currentSeed;
+    
+    [Header("Forced Rooms")]
+    [Tooltip("Rooms that must be spawned regardless of randomness. Each entry sets a min/max count (1-10). Spawns deterministically per seed.")]
+    public List<ForcedRoom> forcedRooms = new List<ForcedRoom>();
 
-    // RNG próprio (não interfere no UnityEngine.Random global)
-    System.Random rng;
+    [Tooltip("If true, applies forced room spawns automatically after the seed is set (on both server and client).")]
+    public bool autoApplyForcedRooms = true;
 
-    // Estado
-    readonly Queue<RoomSocket> frontierQueue = new Queue<RoomSocket>();
-    readonly Stack<RoomSocket> frontierStack = new Stack<RoomSocket>();
-    int roomsPlaced = 0;
+    [Tooltip("Enable debug logs for forced room placement.")]
+    public bool debugForcedRooms = false;
+
+    private bool _forcedApplied = false;
+
+    // Exposto para que os sockets saibam quando priorizar/aguardar forced rooms
+    public static bool ForcedApplied => Instance != null && Instance._forcedApplied;
+
+    void Awake()
+    {
+        Instance = this;
+    }
+
+    void OnEnable()
+    {
+        // subscribe to seed ready to schedule forced rooms after seed propagation
+        SeedReady += HandleSeedReadyInternal;
+    }
+
+    void OnDisable()
+    {
+        SeedReady -= HandleSeedReadyInternal;
+    }
+
+    public override void OnStartServer()
+    {
+        // Apenas o servidor decide a seed final
+        if (randomizeSeed)
+        {
+            // Evita 0 para que mudanÃ§as fiquem mais evidentes, mas 0 tambÃ©m funcionaria
+            seed = UnityEngine.Random.Range(int.MinValue + 1, int.MaxValue);
+        }
+
+        // Anuncia localmente no servidor (clientes receberÃ£o via SyncVar hook)
+        AnnounceSeed(seed);
+    }
+
+    public override void OnStartClient()
+    {
+        // Em clientes, o valor virÃ¡ sincronizado; ainda assim, se jÃ¡ tivermos seed, anuncia.
+        if (!_hasSeed)
+            AnnounceSeed(seed);
+    }
 
     void Start()
     {
-        if (autoRunOnStart) Generate();
+        // Modo offline/sem rede: garante anÃºncio com o valor do inspector
+        if (!NetworkClient.active && !NetworkServer.active)
+        {
+            AnnounceSeed(seed);
+        }
     }
 
-    public void Generate()
+    void OnSeedChanged(int oldValue, int newValue)
     {
-        rng = new System.Random(seed);
-        roomsPlaced = 0;
-        frontierQueue.Clear();
-        frontierStack.Clear();
-
-        GameObject startRoom = BootstrapInitialRoom();
-        if (startRoom == null)
-        {
-            Debug.LogError("[RoomManager] Sala inicial não definida.");
-            return;
-        }
-
-        CollectFrontierFrom(startRoom, exclude: null);
-
-        int iterations = 0;
-        while (HasFrontier() && roomsPlaced < Mathf.Max(1, maxRooms) && iterations < safetyIterations)
-        {
-            iterations++;
-
-            var socket = PopFrontier();
-            if (socket == null) continue;
-            if (socket.deadEnd || socket.IsOccupied || !socket.HasOptions) continue;
-
-            // Seleciona deterministicamente uma opção válida
-            var candidates = GetValidOptions(socket);
-            if (candidates.Count == 0) continue;
-
-            int pick = rng.Next(candidates.Count);
-            var chosen = candidates[pick];
-
-            var instance = socket.TrySpawn(chosen);
-            if (instance == null) continue;
-
-            // Reparent global, se solicitado
-            if (worldParent != null) instance.transform.SetParent(worldParent, true);
-
-            roomsPlaced++;
-
-            // Marcar o socket “de retorno” do novo cômodo e adicionar novos sockets à fronteira
-            SealBackConnectionAndExpand(socket, instance);
-
-            // Parada: respeitar maxRooms (inclui a inicial)
-            if (roomsPlaced >= maxRooms)
-                break;
-        }
-
-        if (verboseLog)
-            Debug.Log($"[RoomManager] Geração concluída. Iterações={iterations}, Rooms={roomsPlaced} (inclui inicial).");
+        AnnounceSeed(newValue);
     }
 
-    GameObject BootstrapInitialRoom()
+    private static void AnnounceSeed(int value)
     {
-        GameObject start = existingInitialRoom;
-        if (start == null && initialRoomPrefab != null)
-        {
-            Vector3 pos = initialAnchor ? initialAnchor.position : Vector3.zero;
-            Quaternion rot = initialAnchor ? initialAnchor.rotation : Quaternion.identity;
-            start = Instantiate(initialRoomPrefab, pos, rot, worldParent ? worldParent : null);
-            roomsPlaced++; // conta a sala inicial
-            if (verboseLog) Debug.Log("[RoomManager] Inicial instanciado via prefab.");
-        }
-        else if (start != null)
-        {
-            roomsPlaced++; // conta a sala inicial existente
-            if (verboseLog) Debug.Log("[RoomManager] Inicial existente encontrado na cena.");
-        }
-        return start;
+        _currentSeed = value;
+        _hasSeed = true;
+        try { SeedReady?.Invoke(value); }
+        catch (Exception e) { Debug.LogException(e); }
     }
 
-    void CollectFrontierFrom(GameObject root, RoomSocket exclude)
+    // ---------------- Forced Rooms logic ----------------
+    [Serializable]
+    public class ForcedRoom
     {
-        var sockets = root.GetComponentsInChildren<RoomSocket>(true);
-        foreach (var s in sockets)
+        [Tooltip("Room prefab to force spawn (must exist in a RoomSocket option).")]
+        public GameObject prefab;
+
+        [Tooltip("Minimum number of this room to spawn (1-10).")]
+        [Range(1, 10)] public int min = 1;
+
+        [Tooltip("Maximum number of this room to spawn (1-10).")]
+        [Range(1, 10)] public int max = 1;
+    }
+
+    private void HandleSeedReadyInternal(int readySeed)
+    {
+        if (!autoApplyForcedRooms) return;
+        if (_forcedApplied) return;
+        // Defer a couple of frames so sockets that spawn on seed can resolve first
+        StartCoroutine(ApplyForcedRoomsDeferred());
+    }
+
+    private IEnumerator ApplyForcedRoomsDeferred()
+    {
+        // Wait 2 frames to allow RoomSocket spawnOnStart to run
+        yield return null;
+        yield return null;
+        ApplyForcedRoomsNow();
+    }
+
+    public void ApplyForcedRoomsNow()
+    {
+        if (_forcedApplied) return;
+        if (forcedRooms == null || forcedRooms.Count == 0) { _forcedApplied = true; return; }
+
+        int gseed = CurrentSeed;
+
+        foreach (var fr in forcedRooms)
         {
+            if (fr == null || fr.prefab == null) continue;
+
+            // Normalize range
+            int min = Mathf.Clamp(Mathf.Min(fr.min, fr.max), 1, 10);
+            int max = Mathf.Clamp(Mathf.Max(fr.min, fr.max), 1, 10);
+
+            // Deterministic count from seed + prefab name
+            int target = DeterministicRange(gseed, GetSafeName(fr.prefab), min, max);
+            if (target <= 0) continue;
+
+            // Collect candidate sockets that can spawn this prefab via one of their options
+            var candidates = CollectEligibleSocketsForPrefab(fr.prefab);
+
+            // Sort deterministically: by distance to manager, then by hierarchy path string
+            Vector3 origin = transform != null ? transform.position : Vector3.zero;
+            candidates.Sort((a, b) =>
+            {
+                float da = (a.socket.transform.position - origin).sqrMagnitude;
+                float db = (b.socket.transform.position - origin).sqrMagnitude;
+                if (Mathf.Approximately(da, db))
+                {
+                    string pa = GetHierarchyPath(a.socket.transform);
+                    string pb = GetHierarchyPath(b.socket.transform);
+                    return string.Compare(pa, pb, StringComparison.Ordinal);
+                }
+                return da < db ? -1 : 1;
+            });
+
+            int placed = 0;
+            for (int i = 0; i < candidates.Count && placed < target; i++)
+            {
+                var c = candidates[i];
+                if (!IsEligible(c.socket)) continue;
+
+                var go = c.socket.TrySpawn(c.option);
+                if (go != null)
+                {
+                    placed++;
+                    if (debugForcedRooms)
+                        Debug.Log($"[RoomManager] Forced spawn '{GetSafeName(fr.prefab)}' at {GetHierarchyPath(c.socket.transform)}");
+                }
+            }
+
+            if (debugForcedRooms)
+                Debug.Log($"[RoomManager] Forced '{GetSafeName(fr.prefab)}': requested {target}, placed {placed}, candidates {candidates.Count}");
+        }
+
+        _forcedApplied = true;
+    }
+
+    private static bool IsEligible(RoomSocket s)
+    {
+        if (s == null) return false;
+        if (s.deadEnd) return false;
+        if (s.IsOccupied) return false;
+        if (!s.HasOptions) return false;
+        if (s.HasDescendantOccupied()) return false;
+        return true;
+    }
+
+    private static List<(RoomSocket socket, RoomSocketOption option)> CollectEligibleSocketsForPrefab(GameObject prefab)
+    {
+        var list = new List<(RoomSocket, RoomSocketOption)>();
+        var all = RoomSocket.All;
+        for (int i = 0; i < all.Count; i++)
+        {
+            var s = all[i];
             if (s == null) continue;
-            if (s == exclude) continue;
-            if (s.deadEnd) continue;
-            if (s.IsOccupied) continue;
-            PushFrontier(s);
+            var opts = s.options;
+            if (opts == null) continue;
+            for (int k = 0; k < opts.Count; k++)
+            {
+                var opt = opts[k];
+                if (opt == null || opt.prefab == null) continue;
+                if (ReferenceEquals(opt.prefab, prefab))
+                {
+                    list.Add((s, opt));
+                }
+            }
         }
-    }
-
-    List<RoomSocketOption> GetValidOptions(RoomSocket socket)
-    {
-        var list = new List<RoomSocketOption>();
-        if (socket.options == null) return list;
-        foreach (var o in socket.options)
-        {
-            if (o != null && o.prefab != null)
-                list.Add(o);
-        }
-        // Embaralha determinísticamente pela seed corrente (opcional)
-        FisherYates(list);
         return list;
     }
 
-    void SealBackConnectionAndExpand(RoomSocket sourceSocket, GameObject newRoom)
+    private static int DeterministicRange(int seed, string key, int min, int max)
     {
-        // Encontrar no novo cômodo o socket que “casou” com o sourceSocket:
-        // heurística: menor distância ao socket fonte + orientação oposta (maior dot negativo).
-        var candidateSockets = newRoom.GetComponentsInChildren<RoomSocket>(true);
-        RoomSocket best = null;
-        float bestScore = float.PositiveInfinity;
-
-        Vector3 srcPos = sourceSocket.transform.position;
-        Vector3 srcFwd = sourceSocket.transform.forward;
-
-        foreach (var s in candidateSockets)
+        if (min > max) { var t = min; min = max; max = t; }
+        unchecked
         {
-            if (s == null) continue;
+            int h = StableHash(seed.ToString() + ":" + key);
+            uint uh = (uint)h;
+            uint span = (uint)(max - min + 1);
+            int v = (int)(uh % span);
+            return min + v;
+        }
+    }
 
-            // Não considerar sockets já ocupados ou deadEnd para a volta
-            if (s.IsOccupied) continue;
+    private static string GetHierarchyPath(Transform t)
+    {
+        if (t == null) return string.Empty;
+        var names = new System.Collections.Generic.Stack<string>();
+        Transform it = t;
+        while (it != null)
+        {
+            names.Push(it.name);
+            it = it.parent;
+        }
+        return string.Join("/", names);
+    }
 
-            float dist = (s.transform.position - srcPos).sqrMagnitude;
-            float facing = 1f - Mathf.Max(-1f, Vector3.Dot(s.transform.forward, -srcFwd));
-            // facing ~0 quando opostos, ~2 quando alinhados; somar ao custo
-            float score = dist + facing * 0.25f; // peso leve para orientação
-
-            if (score < bestScore)
+    private static int StableHash(string s)
+    {
+        unchecked
+        {
+            const int fnvPrime = 16777619;
+            int hash = (int)2166136261;
+            for (int i = 0; i < s.Length; i++)
             {
-                bestScore = score;
-                best = s;
+                hash ^= s[i];
+                hash *= fnvPrime;
             }
-        }
-
-        // Marca os dois lados como ocupados (source já foi marcado ao instanciar)
-        if (best != null)
-            best.MarkOccupied(true);
-
-        // Expande fronteira com os demais sockets do novo cômodo
-        foreach (var s in candidateSockets)
-        {
-            if (s == null) continue;
-            if (s == best) continue;
-            if (s.deadEnd) continue;
-            if (s.IsOccupied) continue;
-            PushFrontier(s);
+            return hash;
         }
     }
 
-    // ---- Fronteira (BFS/DFS) ----
-    bool HasFrontier()
+    private static string GetSafeName(UnityEngine.Object o)
     {
-        return useBFS ? frontierQueue.Count > 0 : frontierStack.Count > 0;
-    }
-
-    RoomSocket PopFrontier()
-    {
-        if (useBFS)
-        {
-            while (frontierQueue.Count > 0)
-            {
-                var s = frontierQueue.Dequeue();
-                if (s != null) return s;
-            }
-        }
-        else
-        {
-            while (frontierStack.Count > 0)
-            {
-                var s = frontierStack.Pop();
-                if (s != null) return s;
-            }
-        }
-        return null;
-    }
-
-    void PushFrontier(RoomSocket s)
-    {
-        if (useBFS) frontierQueue.Enqueue(s);
-        else frontierStack.Push(s);
-    }
-
-    // ---- Util ----
-    void FisherYates<T>(IList<T> arr)
-    {
-        for (int i = 0; i < arr.Count; i++)
-        {
-            int j = i + rng.Next(arr.Count - i);
-            (arr[i], arr[j]) = (arr[j], arr[i]);
-        }
+        return o != null ? o.name : "(null)";
     }
 }

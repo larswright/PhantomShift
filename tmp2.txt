@@ -1,0 +1,75 @@
+        if (nearest != null)
+        {
+            Debug.Log(nearest.gameObject.name);
+
+            // Somente marcar como ocupado se o socket pertencer a um root instanciado por este RoomSocket
+            if (IsOwnedTransform(nearest.transform))
+            {
+                nearest.MarkOccupied(true);
+            }
+        }
+    }
+
+    // ----- Ownership helpers -----
+    private void RegisterOwnedRoot(Transform root)
+    {
+        if (root == null) return;
+
+        var own = root.GetComponent<SpawnOwnership>();
+        if (own == null) own = root.gameObject.AddComponent<SpawnOwnership>();
+        own.owner = this;
+
+        if (!ownedRoots.Contains(root))
+            ownedRoots.Add(root);
+
+        CleanupOwnedRoots();
+    }
+
+    private void UnregisterOwnedRoot(Transform root)
+    {
+        if (root == null) return;
+        ownedRoots.Remove(root);
+        CleanupOwnedRoots();
+    }
+
+    private bool IsOwnedTransform(Transform t)
+    {
+        if (t == null) return false;
+        CleanupOwnedRoots();
+        for (int i = 0; i < ownedRoots.Count; i++)
+        {
+            var r = ownedRoots[i];
+            if (r == null) continue;
+            if (t == r || t.IsChildOf(r))
+                return true;
+        }
+        return false;
+    }
+
+    private void CleanupOwnedRoots()
+    {
+        for (int i = ownedRoots.Count - 1; i >= 0; i--)
+        {
+            if (ownedRoots[i] == null)
+                ownedRoots.RemoveAt(i);
+        }
+    }
+
+    // ---------------- Seed helpers ----------------
+    private void HandleSeedReady(int globalSeed)
+    {
+        if (hasSeed && receivedSeed == globalSeed)
+            return; // já configurado
+
+        receivedSeed = globalSeed;
+        hasSeed = true;
+
+        if (spawnOnStart && currentInstance == null)
+        {
+            TrySpawnDeterministic();
+        }
+    }
+
+    private int DeterministicIndex(int globalSeed)
+    {
+        // Usa uma hash estável do (seed + caminho hierárquico) para variar por socket

@@ -102,15 +102,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a410ae3c527505b47bd8f45d26dcb6df, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::RoomSocket
-  options:
-  - prefab: {fileID: 96172821747295322, guid: 432534a42b2d4d747a0f4397ee096181, type: 3}
-    localOffset: {x: -24.8, y: -10.15, z: 0}
-    localEuler: {x: 0, y: 180, z: 0}
+  options: []
   spawnOnStart: 1
   deadEnd: 0
   instanceParent: {fileID: 0}
   occupied: 0
   currentInstance: {fileID: 0}
+  hasSeed: 0
+  receivedSeed: 0
+  ownedRoots: []
 --- !u!1001 &480367204705015911
 PrefabInstance:
   m_ObjectHideFlags: 0
