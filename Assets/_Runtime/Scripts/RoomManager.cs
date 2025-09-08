@@ -42,7 +42,15 @@ public class RoomManager : NetworkBehaviour
     [Tooltip("Enable debug logs for forced room placement.")]
     public bool debugForcedRooms = false;
 
+    [Header("Limits")]
+    [Tooltip("Número máximo de salas instanciadas. 0 ou negativo = ilimitado.")]
+    public int maxRooms = 0;  // NOVO
+
     private bool _forcedApplied = false;
+
+    private static readonly HashSet<int> _spawnedIds = new HashSet<int>(); // NOVO
+    public static int CurrentRooms => _spawnedIds.Count; // NOVO
+    public static bool IsAtMaxRooms => Instance != null && Instance.maxRooms > 0 && _spawnedIds.Count >= Instance.maxRooms; // NOVO
 
     // Exposto para que os sockets saibam quando priorizar/aguardar forced rooms
     public static bool ForcedApplied => Instance != null && Instance._forcedApplied;
@@ -100,9 +108,60 @@ public class RoomManager : NetworkBehaviour
     private static void AnnounceSeed(int value)
     {
         _currentSeed = value;
-        _hasSeed = true;
+       _hasSeed = true;
         try { SeedReady?.Invoke(value); }
         catch (Exception e) { Debug.LogException(e); }
+    }
+
+    // ---- Spawn tracking & sealing ----
+    public static void NotifyRoomSpawned(GameObject go)
+    {
+        if (go == null) return;
+        if (_spawnedIds.Add(go.GetInstanceID()))
+        {
+            if (IsAtMaxRooms)
+                Instance?.StartCoroutine(Instance.SealOpenSocketsDeferred());
+        }
+    }
+
+    public static void NotifyRoomDespawned(GameObject go)
+    {
+        if (go == null) return;
+        _spawnedIds.Remove(go.GetInstanceID());
+    }
+
+    private IEnumerator SealOpenSocketsDeferred()
+    {
+        // dá um frame para evitar corrida com spawns em andamento
+        yield return null;
+        SealOpenSocketsNow();
+    }
+
+    public void SealOpenSocketsNow()
+    {
+        var all = RoomSocket.All;
+        for (int i = 0; i < all.Count; i++)
+        {
+            var s = all[i];
+            if (s == null) continue;
+            if (s.IsOccupied) continue;
+            if (!s.HasOptions) continue;
+
+            RoomSocketOption chosen = null;
+            var opts = s.options;
+            for (int k = 0; k < opts.Count; k++)
+            {
+                var opt = opts[k];
+                if (opt != null && opt.prefab != null && opt.isDeadEnd)
+                {
+                    chosen = opt;
+                    break;
+                }
+            }
+
+            if (chosen != null)
+                s.TrySpawn(chosen); // permitido pois é dead end
+        }
     }
 
     // ---------------- Forced Rooms logic ----------------

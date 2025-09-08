@@ -10,6 +10,9 @@ public class RoomSocketOption
     public GameObject prefab;     // Prefab a instanciar
     public Vector3 localOffset;   // Offset relativo ao socket (espaço local)
     public Vector3 localEuler;    // Rotação relativa ao socket (Euler)
+
+    [Tooltip("Se verdadeiro, este prefab é uma peça de término (dead end).")]
+    public bool isDeadEnd = false;   // NOVO
 }
 
 [AddComponentMenu("Level/Room Socket")]
@@ -108,16 +111,34 @@ public class RoomSocket : MonoBehaviour, ISeedReceiver
     public GameObject TrySpawnRandom()
     {
         if (!CanSpawn()) return null;
+
+        // Define o pool respeitando o limite global
+        List<RoomSocketOption> pool = options;
+        if (RoomManager.IsAtMaxRooms)
+        {
+            pool = new List<RoomSocketOption>();
+            for (int k = 0; k < options.Count; k++)
+            {
+                var o = options[k];
+                if (o != null && o.prefab != null && o.isDeadEnd)
+                    pool.Add(o);
+            }
+            if (pool.Count == 0) return null; // sem dead ends para selar
+        }
+
+        int idx;
         if (hasSeed)
         {
-            int i = DeterministicIndex(receivedSeed);
-            return TrySpawn(options[i]);
+            int h = StableHash(receivedSeed.ToString() + ":" + GetHierarchyPath(transform));
+            uint uh = unchecked((uint)h);
+            idx = (int)(uh % (uint)pool.Count);
         }
         else
         {
-            int i = UnityEngine.Random.Range(0, options.Count);
-            return TrySpawn(options[i]);
+            idx = UnityEngine.Random.Range(0, pool.Count);
         }
+
+        return TrySpawn(pool[idx]);
     }
 
     /// <summary>
@@ -126,6 +147,10 @@ public class RoomSocket : MonoBehaviour, ISeedReceiver
     public GameObject TrySpawn(RoomSocketOption option)
     {
         if (!CanSpawn() || option == null || option.prefab == null)
+            return null;
+
+        // Se já atingiu o máximo de salas, apenas dead ends podem ser instanciados
+        if (RoomManager.IsAtMaxRooms && !option.isDeadEnd)
             return null;
 
         Vector3 worldPos = transform.TransformPoint(option.localOffset);
@@ -141,6 +166,8 @@ public class RoomSocket : MonoBehaviour, ISeedReceiver
         // REQUISITO: logar o nome do socket mais próximo do instanciador
         // e SÓ marcar ocupado se o socket pertencer a um objeto instanciado por ESTE RoomSocket.
         LogAndOccupyNearestSocketOwnedOnly();
+
+        RoomManager.NotifyRoomSpawned(currentInstance); // NOVO
 
         return currentInstance;
     }
@@ -158,6 +185,8 @@ public class RoomSocket : MonoBehaviour, ISeedReceiver
     {
         if (currentInstance != null)
         {
+            RoomManager.NotifyRoomDespawned(currentInstance); // NOVO
+
             // Remover da lista de propriedade, se presente
             UnregisterOwnedRoot(currentInstance.transform);
 
@@ -342,17 +371,6 @@ public class RoomSocket : MonoBehaviour, ISeedReceiver
         {
             TrySpawnDeterministic();
         }
-    }
-
-    private int DeterministicIndex(int globalSeed)
-    {
-        // Usa uma hash estável do (seed + caminho hierárquico) para variar por socket
-        string key = globalSeed.ToString() + ":" + GetHierarchyPath(transform);
-        int h = StableHash(key);
-        uint uh = unchecked((uint)h);
-        uint count = unchecked((uint)options.Count);
-        int idx = (int)(uh % count);
-        return idx;
     }
 
     private static string GetHierarchyPath(Transform t)
