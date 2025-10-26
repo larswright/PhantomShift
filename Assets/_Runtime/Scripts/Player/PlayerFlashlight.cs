@@ -33,7 +33,7 @@ public class PlayerFlashlight : NetworkBehaviour
     // ===== Input (somente no cliente local) =====
     private InputSystem_Actions actions;
     private InputAction flashlightAction; // toggle normal
-    private InputAction holdUVAction;     // hold UV
+    private InputAction uvAction;         // toggle UV
 
     // ===== Server runtime =====
     private Coroutine drainCo;
@@ -62,7 +62,7 @@ public class PlayerFlashlight : NetworkBehaviour
     {
         // Estado inicial
         uvSecondsRemaining = MaxUVSeconds;
-        normalOn = false;
+        normalOn = true;
         uvOn = false;
     }
 
@@ -72,11 +72,10 @@ public class PlayerFlashlight : NetworkBehaviour
         actions.Player.Enable();
 
         flashlightAction = actions.Player.Flashlight; // Button (toggle)
-        holdUVAction     = actions.Player.HoldUV;     // Button (press/hold)
+        uvAction         = actions.Player.HoldUV;     // Button (toggle)
 
         flashlightAction.performed += OnFlashlightTogglePerformed;
-        holdUVAction.performed     += OnHoldUVPressed;
-        holdUVAction.canceled      += OnHoldUVReleased;
+        uvAction.performed         += OnUVTogglePerformed;
 
         // Garante que o visual local reflete o estado inicial replicado
         ApplyNormalVisual(normalOn);
@@ -88,8 +87,7 @@ public class PlayerFlashlight : NetworkBehaviour
         if (isLocalPlayer && actions != null)
         {
             flashlightAction.performed -= OnFlashlightTogglePerformed;
-            holdUVAction.performed     -= OnHoldUVPressed;
-            holdUVAction.canceled      -= OnHoldUVReleased;
+            uvAction.performed         -= OnUVTogglePerformed;
             actions.Player.Disable();
         }
     }
@@ -102,18 +100,10 @@ public class PlayerFlashlight : NetworkBehaviour
         CmdSetNormal(!normalOn);
     }
 
-    void OnHoldUVPressed(InputAction.CallbackContext _)
+    void OnUVTogglePerformed(InputAction.CallbackContext _)
     {
         if (!isLocalPlayer) return;
-        Debug.Log("[PF] HoldUV pressed (cliente)");
-        CmdRequestUV(true);
-    }
-
-    void OnHoldUVReleased(InputAction.CallbackContext _)
-    {
-        if (!isLocalPlayer) return;
-        Debug.Log("[PF] HoldUV released (cliente)");
-        CmdRequestUV(false);
+        CmdSetUV(!uvOn);
     }
 
     // ===== Commands =====
@@ -126,9 +116,9 @@ public class PlayerFlashlight : NetworkBehaviour
     }
 
     [Command]
-    void CmdRequestUV(bool wantOn)
+    void CmdSetUV(bool wantOn)
     {
-        Debug.Log($"[PF][SV] CmdRequestUV({wantOn}) uvOn={uvOn} uvSeconds={uvSecondsRemaining:F2}");
+        Debug.Log($"<color=cyan>[PF][SV] CmdSetUV({wantOn}) uvOn={uvOn} uvSeconds={uvSecondsRemaining:F2}</color>");
         if (wantOn)
         {
             // Liga se houver recurso
@@ -140,7 +130,7 @@ public class PlayerFlashlight : NetworkBehaviour
         }
         else
         {
-            // Desliga sob comando do cliente (soltou o botão)
+            // Desliga
             if (uvOn)
             {
                 uvOn = false;
@@ -223,17 +213,38 @@ public class PlayerFlashlight : NetworkBehaviour
 
     IEnumerator ServerDrainLoop()
     {
+        var waitForInterval = new WaitForSeconds(uvReportInterval);
+        bool ghostHit = false; // Flag para controlar se um fantasma foi atingido no intervalo
+
         // Consome tempo enquanto UV estiver ligada e houver tempo
         while (uvOn && uvSecondsRemaining > 0f)
         {
-            uvSecondsRemaining -= Time.deltaTime;
-            if (uvSecondsRemaining <= 0f)
+            // Raycast para detectar fantasmas
+            var ray = new Ray(uvRayOrigin.position, uvRayOrigin.forward);
+            if (Physics.SphereCast(ray, uvRayRadius, out var hit, uvRayDistance, uvLayerMask, QueryTriggerInteraction.Collide))
             {
-                uvSecondsRemaining = 0f;
-                uvOn = false; // Auto-off quando acabar
-                break;
+                var cap = hit.collider.GetComponentInParent<GhostCaptureable>();
+                if (cap)
+                {
+                    ghostHit = true;
+                    Debug.Log($"<color=yellow>[PF][SV] UV is hitting a ghost. Draining charge.</color>");
+                }
             }
-            yield return null;
+
+            // Se um fantasma foi atingido, drena a carga
+            if (ghostHit)
+            {
+                uvSecondsRemaining -= uvReportInterval;
+                if (uvSecondsRemaining <= 0f)
+                {
+                    uvSecondsRemaining = 0f;
+                    uvOn = false; // Auto-off quando acabar
+                    break;
+                }
+                ghostHit = false; // Reseta o flag
+            }
+
+            yield return waitForInterval;
         }
         drainCo = null;
     }

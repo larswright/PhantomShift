@@ -64,17 +64,32 @@ public class PlayerVacuum : NetworkBehaviour
     void Update()
     {
         if (!isLocalPlayer) return;
+
+        // Se o botão de vácuo foi pressionado neste frame
+        if (holdVacuumAction.action.WasPressedThisFrame())
+        {
+            var ray = new Ray(vacuumRayOrigin.position, vacuumRayOrigin.forward);
+            if (Physics.SphereCast(ray, vacuumRayRadius, out var hit, vacuumRayDistance, vacuumLayerMask, QueryTriggerInteraction.Collide))
+            {
+                var cap = hit.collider.GetComponentInParent<GhostCaptureable>();
+                if (cap && cap.netIdentity)
+                {
+                    CmdAttemptMinigame(cap.netIdentity.netId);
+                }
+            }
+        }
+
         if (!holdingVacuum) return;
         if (!vacuumRayOrigin) return;
 
         // Ray visual
-        var ray = new Ray(vacuumRayOrigin.position, vacuumRayOrigin.forward);
-        Debug.DrawRay(ray.origin, ray.direction * vacuumRayDistance, Color.cyan);
+        var ray2 = new Ray(vacuumRayOrigin.position, vacuumRayOrigin.forward);
+        Debug.DrawRay(ray2.origin, ray2.direction * vacuumRayDistance, Color.cyan);
 
         if (Time.time < nextReportTime) return;
         nextReportTime = Time.time + reportInterval;
 
-        if (Physics.SphereCast(ray, vacuumRayRadius, out var hit, vacuumRayDistance, vacuumLayerMask, QueryTriggerInteraction.Collide))
+        if (Physics.SphereCast(ray2, vacuumRayRadius, out var hit, vacuumRayDistance, vacuumLayerMask, QueryTriggerInteraction.Collide))
         {
             var cap = hit.collider.GetComponentInParent<GhostCaptureable>();
             if (cap && cap.netIdentity)
@@ -97,6 +112,17 @@ public class PlayerVacuum : NetworkBehaviour
         // netId do jogador que está sugando
         uint playerNetId = sender != null && sender.identity ? sender.identity.netId : netIdentity.netId;
         vac.ServerApplyVacuumHit(playerNetId, origin, dir, dt);
+    }
+
+    [Command(requiresAuthority = false)]
+    void CmdAttemptMinigame(uint ghostNetId, NetworkConnectionToClient sender = null)
+    {
+        if (!NetworkServer.spawned.TryGetValue(ghostNetId, out var id)) return;
+        var vac = id.GetComponent<GhostVacuum>();
+        if (!vac) return;
+
+        uint playerNetId = sender != null && sender.identity ? sender.identity.netId : netIdentity.netId;
+        vac.ServerAttemptMinigame(playerNetId);
     }
 }
 
