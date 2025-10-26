@@ -96,6 +96,20 @@ public class GhostVacuum : NetworkBehaviour
             CompleteCapture();
     }
 
+    [Server]
+    public void ServerAttemptMinigame(uint playerNetId)
+    {
+        if (!cap || !ghost) return;
+        if (!cap.IsStunned()) return;
+
+        Debug.Log($"<color=green>[GV][SV] Player {playerNetId} attempting minigame on {netId}.</color>");
+
+        // Inicia a captura e o minigame
+        StartCapturing(playerNetId);
+        cap.ServerForceExitStunKeepFrozen();
+        TryEnterMinigameIfNeeded();
+    }
+
     // ============== Internals ==============
 
     [Server]
