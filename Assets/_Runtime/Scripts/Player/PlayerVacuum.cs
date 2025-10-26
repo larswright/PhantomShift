@@ -89,9 +89,9 @@ public class PlayerVacuum : NetworkBehaviour
         if (Time.time < nextReportTime) return;
         nextReportTime = Time.time + reportInterval;
 
-        if (Physics.SphereCast(ray2, vacuumRayRadius, out var hit, vacuumRayDistance, vacuumLayerMask, QueryTriggerInteraction.Collide))
+        if (Physics.SphereCast(ray2, vacuumRayRadius, out var hitInfo, vacuumRayDistance, vacuumLayerMask, QueryTriggerInteraction.Collide))
         {
-            var cap = hit.collider.GetComponentInParent<GhostCaptureable>();
+            var cap = hitInfo.collider.GetComponentInParent<GhostCaptureable>();
             if (cap && cap.netIdentity)
             {
                 // Reporta tick de sucção
