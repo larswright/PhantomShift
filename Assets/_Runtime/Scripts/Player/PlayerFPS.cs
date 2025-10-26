@@ -2,6 +2,12 @@ using Mirror;
 using UnityEngine;
 using UnityEngine.InputSystem; // Novo Input System
 
+// IMPORTANTES (Prefab):
+// 1) Adicione NetworkTransform ao prefab do Player e deixe AUTORIDADE DO SERVIDOR (client authority DESMARCADO).
+// 2) Deixe Camera e AudioListener desabilitados no prefab; só o dono habilita em OnStartLocalPlayer.
+// 3) O movimento acontece SOMENTE no servidor; o cliente envia inputs via [Command].
+// 4) Opcional: reduza o rate de comandos (ex.: enviar em FixedUpdate) se precisar poupar banda.
+
 [RequireComponent(typeof(CharacterController))]
 public class PlayerFPS : NetworkBehaviour
 {
@@ -17,7 +23,7 @@ public class PlayerFPS : NetworkBehaviour
     [Tooltip("Velocidade correndo (m/s)")]
     public float sprintSpeed = 9f;
     public float jumpHeight = 1.4f;
-    public float gravity = -9.81f;   // Use valor negativo
+    public float gravity = -9.81f;   // Use valor NEGATIVO
 
     [Header("Câmera")]
     public float mouseSensitivity = 120f;
@@ -32,15 +38,21 @@ public class PlayerFPS : NetworkBehaviour
     InputAction sprintAction;
     InputAction jumpAction;
 
-    // estado interno
-    float pitch;       // rotação X da câmera
-    float yaw;         // rotação Y do corpo
-    float yVelocity;   // velocidade vertical (gravidade/pulo)
+    // ======== ESTADO LOCAL (apenas cliente dono) ========
+    float localPitch;   // rotação X da câmera (não sincroniza)
+    float localYaw;     // yaw visual imediato; servidor recebe via Cmd e domina o transform
 
-    Vector2 moveInput; // W/A/S/D ou stick
-    Vector2 lookInput; // delta do mouse ou stick direito
-    bool sprintHeld;   // LeftShift ou equivalente
-    bool jumpQueued;   // sobe 1 frame quando botão dispara
+    Vector2 moveInput; // input bruto local (WASD / analógico)
+    Vector2 lookInput; // delta mouse / stick direito
+    bool sprintHeld;   // Shift
+    bool jumpQueued;   // sobe 1 frame no performed
+
+    // ======== ESTADO AUTORITATIVO (servidor) ========
+    Vector2 s_moveInput;
+    bool s_sprintHeld;
+    bool s_jumpQueued;
+    float s_yaw;        // yaw autoritativo do corpo
+    float s_yVelocity;  // gravidade/pulo no servidor
 
     void Reset()
     {
@@ -90,8 +102,8 @@ public class PlayerFPS : NetworkBehaviour
             Cursor.visible = false;
         }
 
-        // inicia yaw a partir da rotação atual
-        yaw = transform.eulerAngles.y;
+        // Inicializa yaw local a partir da rotação atual
+        localYaw = transform.eulerAngles.y;
 
         // Habilita ações somente no local player
         actions.Player.Enable();
@@ -126,51 +138,72 @@ public class PlayerFPS : NetworkBehaviour
     {
         if (!isLocalPlayer) return;
 
-        Look();
-        Move();
+        // 1) Look local (responsivo)
+        LookLocal();
+
+        // 2) Envia inputs ao servidor
+        CmdSetInputs(moveInput, sprintHeld, jumpQueued, localYaw);
+        jumpQueued = false; // consome o evento local
     }
 
-    void Look()
+    void LookLocal()
     {
-        // lookInput vem de Pointer.delta / RightStick, etc. (mapa "Look")
-        // Ajuste de sensibilidade; manter * Time.deltaTime para suavizar.
         float mouseX = lookInput.x * mouseSensitivity * Time.deltaTime;
         float mouseY = lookInput.y * mouseSensitivity * Time.deltaTime;
 
-        yaw += mouseX;
-        pitch -= mouseY;
-        pitch = Mathf.Clamp(pitch, minPitch, maxPitch);
+        localYaw += mouseX;
+        localPitch -= mouseY;
+        localPitch = Mathf.Clamp(localPitch, minPitch, maxPitch);
 
-        // gira o corpo no Y
-        transform.rotation = Quaternion.Euler(0f, yaw, 0f);
-        // gira a câmera no X (pitch)
+        // Yaw visual imediato (cliente). O servidor sobrescreve via NetworkTransform.
+        transform.rotation = Quaternion.Euler(0f, localYaw, 0f);
+
+        // Pitch só na câmera local
         if (camRoot != null)
-            camRoot.localRotation = Quaternion.Euler(pitch, 0f, 0f);
+            camRoot.localRotation = Quaternion.Euler(localPitch, 0f, 0f);
     }
 
-    void Move()
+    // ======== LOOP DE MOVIMENTO NO SERVIDOR ========
+    [ServerCallback]
+    void FixedUpdate()
     {
-        // moveInput.x = A/D; moveInput.y = W/S (ou analógico)
-        Vector3 inputDir = transform.right * moveInput.x + transform.forward * moveInput.y;
+        if (!isServer) return;
+
+        // Aplica yaw autoritativo
+        transform.rotation = Quaternion.Euler(0f, s_yaw, 0f);
+
+        // Direção no plano XZ baseada no yaw do servidor
+        Vector3 inputDir = transform.right * s_moveInput.x + transform.forward * s_moveInput.y;
         if (inputDir.sqrMagnitude > 1f) inputDir.Normalize();
 
-        float speed = sprintHeld ? sprintSpeed : walkSpeed;
+        float speed = s_sprintHeld ? sprintSpeed : walkSpeed;
 
-        // Gravidade e pulo
-        if (controller.isGrounded && yVelocity < 0f)
-            yVelocity = -2f; // "cola" no chão
+        // Gravidade/pulo
+        if (controller.isGrounded && s_yVelocity < 0f)
+            s_yVelocity = -2f; // "cola" no chão
 
-        if (controller.isGrounded && jumpQueued)
+        if (controller.isGrounded && s_jumpQueued)
         {
-            yVelocity = Mathf.Sqrt(jumpHeight * -2f * gravity);
-            jumpQueued = false; // consome o evento
+            s_yVelocity = Mathf.Sqrt(jumpHeight * -2f * gravity);
+            s_jumpQueued = false; // consome no servidor
         }
 
-        yVelocity += gravity * Time.deltaTime;
+        s_yVelocity += gravity * Time.fixedDeltaTime;
 
         Vector3 velocity = inputDir * speed;
-        velocity.y = yVelocity;
+        velocity.y = s_yVelocity;
 
-        controller.Move(velocity * Time.deltaTime);
+        controller.Move(velocity * Time.fixedDeltaTime);
+        // NetworkTransform replicará posição/rotação para todos os clientes
+    }
+
+    // ======== RECEBIMENTO DE INPUT DO DONO ========
+    [Command]
+    void CmdSetInputs(Vector2 move, bool sprint, bool jump, float newYaw)
+    {
+        s_moveInput = move;
+        s_sprintHeld = sprint;
+        if (jump) s_jumpQueued = true; // borda de subida
+        s_yaw = newYaw;
     }
 }

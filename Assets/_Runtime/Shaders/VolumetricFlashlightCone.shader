@@ -18,12 +18,8 @@
 
     SubShader
     {
-        Tags
-        {
-            "RenderPipeline"="UniversalRenderPipeline"
-            "Queue"="Transparent"
-            "RenderType"="Transparent"
-        }
+        Tags { "RenderPipeline"="UniversalPipeline" "Queue"="Transparent" "RenderType"="Transparent" }
+
 
         // Additive: ideal for beams/volumetrics look-alikes.
         Blend One One

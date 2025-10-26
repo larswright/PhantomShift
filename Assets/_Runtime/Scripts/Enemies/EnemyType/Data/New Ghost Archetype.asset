@@ -21,8 +21,8 @@ MonoBehaviour:
     stoppingDistance: 0.2
   fleeStats:
     moveSpeed: 10
-    acceleration: 80
-    angularSpeed: 2000
+    acceleration: 15
+    angularSpeed: 250
     stoppingDistance: 0.05
   wanderRadius: 12
   pathRecalcDistance: 0.6
